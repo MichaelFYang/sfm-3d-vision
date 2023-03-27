@@ -42,7 +42,7 @@ You can customize the SfM pipeline by modifying the following:
 
 This project was inspired by the following resources:
 
-- [OpenCV SfM module](https://docs.opencv.org/4.x/d9/d0c/group__sfm.html)
+- [OpenCV SfM module](https://github.com/opencv/opencv/blob/master/samples/python/stereo_match.py)
 - [Pytorch](https://pytorch.org/)
 - [TODO](https:link)
 
