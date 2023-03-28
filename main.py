@@ -17,14 +17,21 @@ def main():
     mtx, dist = calibrator.calibrate(img_list)
 
     # Initialize feature extractor and feature matcher
-    feature_extractor = FeatureExtractor()
-    feature_matcher = FeatureMatcher()
+    feature_extractor = FeatureExtractor(mtx, dist, method='sift')
+    feature_matcher = FeatureMatcher(matcher='bf')
 
     # Load images
     img1 = cv2.imread('images/img1.jpg')
     img2 = cv2.imread('images/img2.jpg')
 
     # Extract features and descriptors
+    '''
+    Keypoints correspond to specific locations in the image. cv2.KeyPoint
+    Each keypoint is represented by a 2D coordinate (x, y) and a scale and orientation.
+
+    Descriptors are vectors that describe the local appearance of the region around each keypoint.
+    numpy array of size (num_keypoints x descriptor_size)
+    '''
     kp1, des1 = feature_extractor.extract(img1)
     kp2, des2 = feature_extractor.extract(img2)
 

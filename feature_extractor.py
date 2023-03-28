@@ -1,19 +1,18 @@
 import cv2
 
 class FeatureExtractor:
-    def __init__(self, detector='sift'):
+    def __init__(self, mtx, dist, method='sift'):
         """
         Constructor for FeatureExtractor class.
 
         Parameters:
-        - detector: feature detector method (default: 'sift')
+        - mtx: intrinsic camera matrix
+        - dist: distortion coefficients
+        - method: feature extraction method (default: 'sift')
         """
-        if detector == 'sift':
-            self.detector = cv2.xfeatures2d.SIFT_create()
-        elif detector == 'surf':
-            self.detector = cv2.xfeatures2d.SURF_create()
-        elif detector == 'orb':
-            self.detector = cv2.ORB_create()
+        self.mtx = mtx
+        self.dist = dist
+        self.method = method
     
     def extract(self, img):
         """
@@ -26,8 +25,22 @@ class FeatureExtractor:
         - kp: list of keypoints
         - des: list of descriptors
         """
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        kp, des = self.detector.detectAndCompute(gray, None)
+        # Undistort input image
+        img_undist = cv2.undistort(img, self.mtx, self.dist)
+
+        # Convert image to grayscale
+        gray = cv2.cvtColor(img_undist, cv2.COLOR_BGR2GRAY)
+
+        # Detect keypoints and compute descriptors
+        if self.method == 'sift':
+            sift = cv2.SIFT_create()
+            kp, des = sift.detectAndCompute(gray, None)
+        elif self.method == 'surf':
+            surf = cv2.xfeatures2d.SURF_create()
+            kp, des = surf.detectAndCompute(gray, None)
+        else:
+            raise ValueError('Invalid feature extraction method: {}'.format(self.method))
+
         return kp, des
 
 class FeatureMatcher:

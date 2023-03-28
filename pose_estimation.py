@@ -1,15 +1,15 @@
-import numpy as np
 import cv2
+import numpy as np
 
 class PoseEstimator:
     def __init__(self, mtx, dist, method='ransac'):
         """
-        Constructor for FeatureExtractor class.
+        Constructor for PoseEstimator class.
 
-        Parameters:
-        - mtx: intrinsic camera matrix
-        - dist: distortion coefficients
-        - method: feature extraction method (default: 'sift')
+        Args:
+            mtx (numpy.ndarray): Camera matrix.
+            dist (numpy.ndarray): Distortion coefficients.
+            method (str): Method used for estimating essential matrix (default: 'ransac').
         """
         self.mtx = mtx
         self.dist = dist
@@ -17,17 +17,22 @@ class PoseEstimator:
     
     def estimate(self, kp1, kp2, matches):
         """
-        Extracts features and descriptors from an image.
+        Estimate camera pose from matched keypoints.
 
-        Parameters:
-        - img: input image
+        Args:
+            kp1 (list): Keypoints from first image.
+            kp2 (list): Keypoints from second image.
+            matches (list): Matched keypoints between first and second images.
 
         Returns:
-        - kp: list of keypoints
-        - des: list of descriptors
+            numpy.ndarray: Rotation matrix.
+            numpy.ndarray: Translation vector.
         """
         pts1 = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
         pts2 = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
+
+        # Estimate essential matrix and recover pose
         E, _ = cv2.findEssentialMat(pts1, pts2, self.mtx, method=self.method, threshold=0.999, prob=0.999)
         _, R, t, _ = cv2.recoverPose(E, pts1, pts2, self.mtx, None, None, None)
+
         return R, t
