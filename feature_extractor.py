@@ -70,4 +70,6 @@ class FeatureMatcher:
         - matches: list of matches between keypoints
         """
         matches = self.matcher.match(des1, des2)
+        # matches = self.matcher.knnMatch(des1, des2, k=2)
+
         return matches

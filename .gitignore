@@ -1,2 +1,7 @@
 .vscode
 .idea/
+.DS_Store
+__pycache__/
+calibration_images/
+dataset/
+exercise4_solution/
