@@ -31,7 +31,16 @@ This will perform camera calibration using the calibration images in the `calibr
 
 The reconstructed 3D points will be visualized using a 3D scatter plot.
 
-TODO ...
+## Demo: Reconstruction from 2 Images
+
+- Initial matches
+  ![Initial matches with SIFT](results/sift_match.png)
+
+- Inlier matches after RANSAC
+  ![Inlier matches after RANSAC](results/inlier_match.png)
+
+- Triangulation Result
+  ![point clould](results/point_cloud.png)
 
 ## Customization
 
@@ -47,7 +56,7 @@ This project was inspired by the following resources:
 
 - [OpenCV SfM module](https://github.com/opencv/opencv/blob/master/samples/python/stereo_match.py)
 - [Pytorch](https://pytorch.org/)
-- [TODO](https:link)
+- [Exercise SfM pipeline by Hsuan-Hau Liu](https://github.com/hsuanhauliu/structure-from-motion-with-OpenCV)
 
 ## License
 
