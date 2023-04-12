@@ -19,10 +19,13 @@ You can install these libraries using pip:
 
     pip install numpy opencv-python matplotlib
 
+To utilize `cv2.SIFT_create()` you have to install OpenCV with:
+
+    pip install opencv-contrib-python
+
 ## Usage
 
 To run the SfM pipeline, you can use the `main.py` script:
-
 
 This will perform camera calibration using the calibration images in the `calibration_images/` directory, and then reconstruct 3D points from the images in the `images/` directory.
 
