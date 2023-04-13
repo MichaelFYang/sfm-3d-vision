@@ -1,5 +1,4 @@
-import numpy as np
-import cv2
+import torch
 
 class Triangulator:
     def __init__(self, mtx):
@@ -10,28 +9,41 @@ class Triangulator:
         - mtx: intrinsic camera matrix
         """
         self.mtx = mtx
-    
-    def triangulate(self, kp1, kp2, R, t, matches, matchesMask):
-        """
-        Triangulates 3D points from a set of correspondences and camera poses.
 
-        Parameters:
-        - kp1: keypoints in first image
-        - kp2: keypoints in second image
-        - R: rotation matrix from second to first camera
-        - t: translation vector from second to first camera
-        - matches: list of matches between keypoints
+    def triangulate(self, kp1, kp2, R, t, matches):
+        # initialize lists to store the 3D points and their corresponding colors
+        points_3d = []
+        colors = []
 
-        Returns:
-        - pts_3d: list of 3D points
-        """
-        pts1 = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
-        pts2 = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
-        proj_mat1 = np.hstack((np.eye(3), np.zeros((3, 1))))
-        proj_mat2 = np.hstack((R, t))
-        proj_pts1 = cv2.undistortPoints(pts1, self.mtx, None)
-        proj_pts2 = cv2.undistortPoints(pts2, self.mtx, None)
-        pts_4d_hom = cv2.triangulatePoints(proj_mat1, proj_mat2, proj_pts1, proj_pts2)
-        pts_3d_hom = pts_4d_hom / pts_4d_hom[3]
-        pts_3d = pts_3d_hom[:3].T
-        return pts_3d
+        # loop over the matched keypoints
+        for match in matches:
+            # extract the indices of the matched keypoints
+            idx1, idx2 = match.queryIdx, match.trainIdx
+
+            # get the pixel coordinates of the matched keypoints
+            x1, y1 = kp1[idx1].pt
+            x2, y2 = kp2[idx2].pt
+
+            # convert the pixel coordinates to homogeneous coordinates
+            pt1 = torch.tensor([x1, y1, 1]).T
+            pt2 = torch.tensor([x2, y2, 1]).T
+
+            # compute the projection matrices of the two cameras
+            P1 = self.mtx @ torch.eye(3, 4)
+            P2 = self.mtx @ torch.cat((R, t), dim=1)
+
+            # triangulate the 3D point using the two projection matrices
+            pt3d_hom = torch.triangulate_points(P1, P2, pt1.unsqueeze(1), pt2.unsqueeze(1))
+
+            # convert the homogeneous 3D point to Cartesian 3D point
+            pt3d = pt3d_hom[:-1] / pt3d_hom[-1]
+
+            # append the 3D point and its color to the corresponding lists
+            points_3d.append(pt3d)
+            colors.append(kp1[idx1].pt)
+
+        # convert the lists to tensors
+        points_3d = torch.stack(points_3d)
+        colors = torch.tensor(colors)
+
+        return points_3d, colors
