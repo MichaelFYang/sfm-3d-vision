@@ -49,11 +49,11 @@ def main():
     matches = feature_matcher.match(des1, des2)
 
     # store all the good matches as per Lowe's ratio test.
-    # good = []
-    # for m, n in matches:
-    #     if m.distance < 0.7 * n.distance:
-    #         good.append(m)
-    # matches = good
+    good = []
+    for m, n in matches:
+        if m.distance < 0.7 * n.distance:
+            good.append(m)
+    matches = good
 
     draw_params = dict(matchColor=(0, 255, 0),  # draw matches in green color
                        singlePointColor=None,
