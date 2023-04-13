@@ -1,4 +1,20 @@
 import cv2
+import torch
+from typing import Callable, Tuple
+from functools import partial
+
+
+FeatureMatchingFunc = Callable[[torch.Tensor, torch.Tensor], Tuple[torch.Tensor,torch.Tensor]]
+
+def NearestNeighbor_torch(des1: torch.Tensor, des2: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    if (len(des1)==0 or len(des2)==0):
+        print('No match...')
+        return
+    dist_mat = torch.cdist(des1, des2, p=2)
+    match_dists, idxs_in_2 = torch.min(dist_mat, dim=1)
+    idxs_in_1 = torch.arange(0, idxs_in_2.size(0), device=idxs_in_2.device)
+    matches_idxs = torch.cat([idxs_in_1.view(-1,1), idxs_in_2.view(-1,1)], 1)
+    return match_dists.view(-1,1), matches_idxs.view(-1,1)
 
 class FeatureExtractor:
     def __init__(self, mtx, dist, method='sift'):
@@ -73,3 +89,17 @@ class FeatureMatcher:
         # matches = self.matcher.knnMatch(des1, des2, k=2)
 
         return matches
+    
+class FeatureMatcher_torch:
+
+    match: FeatureMatchingFunc
+
+    def __init__(self, matcher="nn"):
+        r"""
+        FeatureMatcher_torch class constructor.
+
+        Parameters:
+        - matcher: feature matcher method (default: 'nn' - nearest neighbor)
+        """
+        if matcher == 'nn':
+            self.match = NearestNeighbor_torch
