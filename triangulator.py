@@ -14,7 +14,7 @@ class Triangulator:
         # initialize lists to store the 3D points and their corresponding colors
         points_3d = []
         colors = []
-
+        # ccc
         # loop over the matched keypoints
         for match in matches:
             # extract the indices of the matched keypoints
