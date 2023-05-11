@@ -79,6 +79,7 @@ def draw_matches(img1, kp1, img2, kp2, matches, inliers):
         if inliers[i] == True:
             color = (0, 255, 0)
         else:
+            continue
             color = (255, 0, 0)
         end1 = tuple(np.round(kp1[m[0]]).astype(int))
         end2 = tuple(np.round(kp2[m[1]]).astype(int) + np.array([img1.shape[1], 0]))

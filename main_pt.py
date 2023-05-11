@@ -1,16 +1,11 @@
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-from calibrator import CameraCalibrator
 from feature_extractor_pt import FeatureExtractor, FeatureMatcher
-from triangulator import Triangulator
-from pose_estimiation_pt import PoseEstimator
 
 import kornia as K
-from kornia_moons.viz import draw_LAF_matches
-import torch
 
-from utils import get_pinhole_intrinsic_params, visualize_LAF, draw_matches
+from utils import get_pinhole_intrinsic_params, draw_matches
 import os
 import argparse
 
@@ -54,12 +49,12 @@ def main():
     Descriptors are vectors that describe the local appearance of the region around each keypoint.
     numpy array of size (num_keypoints x descriptor_size)
     '''
-    import ipdb; ipdb.set_trace()
+    # import ipdb; ipdb.set_trace()
     kp1, des1 = feature_extractor.extract(img1)
     kp2, des2 = feature_extractor.extract(img2)
     
     # scores, matches = K.feature.match_snn(des1, des2, 0.9)
-    scores, matches = K.feature.match_fginn(des1, des2, kp1, kp2)
+    scores, matches = K.feature.match_fginn(des1, des2, kp1, kp2, mutual=True)
 
     # Now RANSAC
     src_pts = kp1[0, matches[:,0], :, 2].data.cpu().numpy()

@@ -14,18 +14,19 @@ class FeatureExtractor:
         if method == 'sift':
             # TODO: add to.(device) in the future
             # self.detector = K.feature.HarrisCornerDetector()
-            self.patch_size = 32
+            self.patch_size = 41
             resp = K.feature.BlobDoG()
-            self.descriptor = K.feature.SIFTDescriptor(self.patch_size, 8)
-            scale_pyr = K.geometry.ScalePyramid(3, 1.6, self.patch_size, double_image=True)
-            nms = K.geometry.ConvQuadInterp3d(10)
-            n_features = 100
+            self.descriptor = K.feature.SIFTDescriptor(self.patch_size)
+            scale_pyr = K.geometry.ScalePyramid(min_size=self.patch_size, double_image=True)
+            nms = K.geometry.ConvQuadInterp3d()
+            n_features = 500
             self.detector = K.feature.ScaleSpaceDetector(n_features,
                                         resp_module=resp,
                                         scale_space_response=True,#We need that, because DoG operates on scale-space
                                         nms_module=nms,
                                         scale_pyr_module=scale_pyr,
-                                        ori_module=K.feature.LAFOrienter(19),
+                                        ori_module=K.feature.LAFOrienter(),
+                                        aff_module=K.feature.LAFAffineShapeEstimator(),
                                         mr_size=6.0,
                                         minima_are_also_good=True) #dark blobs are as good as bright.
 
