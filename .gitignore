@@ -1,5 +1,6 @@
 .vscode
 .idea/
+output/
 .DS_Store
 __pycache__/
 calibration_images/

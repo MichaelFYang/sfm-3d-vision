@@ -94,9 +94,60 @@ class PoseEstimator:
 
         return F_rank2
     
+    def recover_pose_lx(self, E, pts1, pts2, K):
+        K_inv = torch.linalg.inv(K)
+
+        U, S, Vh = torch.linalg.svd(E)
+        S[-1] = 0
+        
+        W_t = torch.tensor([[0, -1, 0],
+                          [1, 0, 0],
+                          [0, 0, 0]], dtype=torch.float32)
+        
+        W_R = torch.tensor([[0, -1, 0],
+                          [1, 0, 0],
+                          [0, 0, 1]], dtype=torch.float32)
+        
+        T_hat_1 = U @ W_t @ torch.diag(S) @ Vh
+        T_hat_2 = - T_hat_1
+
+        R_hat_1 = U @ W_R @ Vh
+        R_hat_2 = - R_hat_1
+
+        t_hat_1 = torch.tensor([T_hat_1[1,2], T_hat_2[0,2], T_hat_1[1,0]])
+        t_hat_2 = torch.tensor([T_hat_2[1,2], T_hat_2[0,2], T_hat_2[1,0]])
+
+        T_1 = K @ t_hat_1
+        T_2 = K @ t_hat_2
+        
+        T_1 = T_1.unsqueeze(1)
+        T_2 = T_2.unsqueeze(1)
+
+        R_1 = K @ R_hat_1 @ K_inv
+        R_2 = K @ R_hat_2 @ K_inv
+
+        for possible_R, possible_t in [(R_1, T_1), (R_1, T_2), (R_2, T_1), (R_2, T_2)]:
+            # Project points into the second camera coordinate system
+            P1 = K @ torch.eye(3, 4, dtype=torch.float32)
+            P2 = K @ torch.cat((possible_R, possible_t), dim=1)
+            points3D = self.triangulate_points(P1, P2, pts1, pts2)
+
+            # Check the cheirality condition
+            valid_points_mask = points3D[:, 2] > 0
+            num_valid_points = torch.sum(valid_points_mask)
+
+            if num_valid_points > valid_points:
+                valid_points = num_valid_points
+                R, T = possible_R, possible_t
+
+
+        return R, T, points3D
+
+
     def recover_pose(self, E, pts1, pts2, K):
         # Perform SVD on the essential matrix
         U, _, Vt = torch.svd(E)
+        Vt = Vt.transpose(-2, -1)
 
         # Ensure that determinant(U) and determinant(Vt) are positive
         if torch.det(U) < 0:
@@ -140,20 +191,16 @@ class PoseEstimator:
 
         for i in range(num_points):
             A = torch.zeros((4, 4), dtype=torch.float32)
-            A[0:2] = pts1[i, 0] * P1[2] - P1[0]
-            A[2:4] = pts1[i, 1] * P1[2] - P1[1]
+            A[0, :] = pts1[i, 0] * P1[2, :] - P1[0, :]
+            A[1, :] = pts1[i, 1] * P1[2, :] - P1[1, :]
+            A[2, :] = pts2[i, 0] * P2[2, :] - P2[0, :]
+            A[3, :] = pts2[i, 1] * P2[2, :] - P2[1, :]
 
-            B = torch.zeros((4, 4), dtype=torch.float32)
-            B[0:2] = pts2[i, 0] * P2[2] - P2[0]
-            B[2:4] = pts2[i, 1] * P2[2] - P2[1]
+            # Perform SVD on A
+            _, _, Vt = torch.svd(A)
 
-            C = torch.matmul(A, torch.inverse(B))
-
-            # Perform SVD on C
-            U, _, Vt = torch.svd(C)
-
-            # The last column of V is the nullspace, which is the solution to Cx = 0
-            X = Vt[-1]
+            # The last column of Vt (transpose of V) gives the solution
+            X = Vt[:, -1]
 
             # Homogeneous to inhomogeneous coordinates
             X = X / X[-1]
