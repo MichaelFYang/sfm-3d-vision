@@ -2,6 +2,7 @@ import numpy as np
 import kornia as K
 import matplotlib.pyplot as plt
 import cv2
+import torch
 
 def get_pinhole_intrinsic_params(calibration_file_dir):
     """
@@ -38,6 +39,36 @@ def visualize_LAF(img, LAF, img_idx = 0):
     plt.show()
     return
 
+def visualize_reprojection(img, points2D, points3D, R, T, K):
+    """Visualize the reprojection errors for multiple points on the image."""
+    fig, ax = plt.subplots(1)
+    ax.imshow(img)
+
+    # Convert points to homogeneous coordinates for projection
+    # points3D = points3D[:, :3] / points3D[:, 3:]
+
+    # Reproject 3D points to 2D
+    points2D_proj = (K @ (R @ points3D.T + T)).T
+    points2D_proj = points2D_proj / points2D_proj[:, 2:]  # Convert back to inhomogeneous coordinates
+
+    # Convert tensors to numpy arrays for visualization
+    points2D = points2D.detach().numpy()
+    points2D_proj = points2D_proj.detach().numpy()
+
+    # Calculate reprojection error
+    error = np.sum(np.sqrt(np.sum((points2D - points2D_proj[:, :2]) ** 2, axis=1)))
+    print(f'Average Reprojection Error: {np.mean(error)}')
+    
+    for i in range(points2D.shape[0]):
+        # Draw the original and reprojected points
+        ax.plot(points2D[i, 0], points2D[i, 1], 'bo')  # Original point in blue
+        ax.plot(points2D_proj[i, 0], points2D_proj[i, 1], 'ro')  # Reprojected point in red
+
+        # Draw a line between original and reprojected points
+        ax.plot([points2D[i, 0], points2D_proj[i, 0]], [points2D[i, 1], points2D_proj[i, 1]], 'g-')  # Error line in green
+
+    plt.show()
+    return error
 
 # drawMatches numpy version
 def draw_matches(img1, kp1, img2, kp2, matches, inliers): 

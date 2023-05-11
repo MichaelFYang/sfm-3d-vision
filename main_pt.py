@@ -4,10 +4,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from feature_extractor_pt import FeatureExtractor, FeatureMatcher
 from pose_estimiation_pt import PoseEstimator
+from reprojection_error import compute_reprojection_error
 
 import kornia as K
 
-from utils import get_pinhole_intrinsic_params, draw_matches
+from utils import get_pinhole_intrinsic_params, draw_matches, visualize_reprojection
 import os
 import argparse
 
@@ -72,48 +73,30 @@ def main():
 
     Em = K.geometry.essential_from_fundamental(Fm, mtx_torch, mtx_torch)
 
-    R_old, T_old, point3d_old = pose_estimator.recover_pose(Em, src_pts, dst_pts, mtx_torch)
-    # R_old, T_old, point3d_old = pose_estimator.recover_pose_lx(Em, src_pts, dst_pts, mtx_torch)
+    # R, T, point3d = pose_estimator.recover_pose(Em, src_pts, dst_pts, mtx_torch)
 
     R, T, point3d = K.geometry.epipolar.motion_from_essential_choose_solution(Em, mtx_torch, mtx_torch, src_pts, dst_pts, mask=None)
+    
+    # reproj_2d_1, reproj_2d_2, err = compute_reprojection_error(point3d, R, T, mtx_torch, src_pts, dst_pts)
 
+    # visualize reprojection on the second image
+    reproject_error = visualize_reprojection(img2, dst_pts, point3d, R, T, mtx_torch)
+    
     point3d = point3d.detach().numpy()
-    point3d_old = point3d_old.detach().numpy()
     # Visualize 3D points
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-    # ax.scatter(point3d[:, 0], point3d[:, 1], point3d[:, 2], c='b', marker='o')
-    # ax.set_xlabel('X')
-    # ax.set_ylabel('Y')
-    # ax.set_zlabel('Z')
-    # plt.savefig('output/3d_points.png')
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(point3d[:, 0], point3d[:, 1], point3d[:, 2], c='b', marker='o')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    plt.savefig('output/3d_points.png')
 
     fig2 = plt.figure()
     new_img = draw_matches(img1, kp1[0, :, :, 2].data.cpu().numpy(), img2, kp2[0, :, :, 2].data.cpu().numpy(), matches.data.cpu().numpy(), inliers)
     plt.imshow(new_img)
     plt.savefig('output/matches.png')
     # plt.show()
-
-    # Create a figure with three subplots
-    fig, axs = plt.subplots(1, 2, layout='constrained')
-    ax = fig.add_subplot(121, projection='3d')
-    ax.scatter(point3d_old[:, 0], point3d_old[:, 1], point3d_old[:, 2], c='b', marker='o')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    # ax.axis('off')
-    ax.set_title("Our")
-
-    ax = fig.add_subplot(122, projection='3d')
-    ax.scatter(point3d[:, 0], point3d[:, 1], point3d[:, 2], c='b', marker='o')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    # ax.axis('off')
-    ax.set_title("GT")
-    plt.savefig('output/3D_pts.png')
-    # Display the figure
-    plt.show()
 
 
 if __name__ == '__main__':

@@ -183,7 +183,7 @@ class PoseEstimator:
                 valid_points = num_valid_points
                 R, T = possible_R, possible_t
 
-        return R, T, points3D
+        return R, T, points3D[:, :3]
 
     def triangulate_points(self, P1, P2, pts1, pts2):
         num_points = pts1.shape[0]
