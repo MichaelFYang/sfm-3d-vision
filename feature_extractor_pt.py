@@ -72,7 +72,7 @@ class FeatureExtractor:
 
 
 class FeatureMatcher:
-    def __init__(self, matcher='bf'):
+    def __init__(self, matcher='fginn'):
         """
         Constructor for FeatureMatcher class.
 
@@ -81,7 +81,7 @@ class FeatureMatcher:
         """
         self.matcher = matcher
 
-    def match(self, des1, des2):
+    def match(self, des1, des2, kp1, kp2):
         """
         Matches features between two sets of descriptors.
 
@@ -92,23 +92,7 @@ class FeatureMatcher:
         Returns:
         - matches: list of matches between keypoints
         """
-        if self.matcher == 'bf':
-            return self.match_brute_force(des1, des2)
+        if self.matcher == 'fginn':
+            return K.feature.match_fginn(des1, des2, kp1, kp2, mutual=True)
         else:
             raise ValueError('Invalid feature matcher method: {}'.format(self.matcher))
-
-    def match_brute_force(self, des1, des2):
-        """
-        Brute force matching of features between two sets of descriptors using L2 distance.
-
-        Parameters:
-        - des1: descriptors from first image
-        - des2: descriptors from second image
-
-        Returns:
-        - matches: list of matches between keypoints
-        """
-        distance_matrix = K.losses.pairwise_distance(des1, des2)
-        matches = torch.argmin(distance_matrix, dim=1)
-
-        return matches

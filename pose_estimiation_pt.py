@@ -1,4 +1,5 @@
 import torch
+import kornia as K
 
 class PoseEstimator:
     def __init__(self, mtx, dist, method='ransac'):
@@ -13,6 +14,7 @@ class PoseEstimator:
         self.mtx = mtx
         self.dist = dist
         self.method = method
+        self.ransca = K.geometry.ransac.RANSAC(model_type='fundamental')
 
     def estimate(self, kp1, kp2, matches):
         """
@@ -64,6 +66,10 @@ class PoseEstimator:
         essential_mat = torch.mm(K.t(), torch.mm(F, K))
 
         return essential_mat
+    
+    def compute_fundametal_matrix_kornia(self, pts1, pts2):
+        Fm, inlier = self.ransca.forward(pts1, pts2)
+        return Fm, inlier
 
     def compute_fundamental_matrix(self, pts1, pts2):
         num_points = pts1.shape[0]
@@ -110,6 +116,7 @@ class PoseEstimator:
         # Determine the correct rotation and translation by checking the cheirality condition
         valid_points = 0
         R, T = None, None
+        points3D = None
 
         for possible_R, possible_t in [(R1, t), (R1, -t), (R2, t), (R2, -t)]:
             # Project points into the second camera coordinate system
@@ -125,7 +132,7 @@ class PoseEstimator:
                 valid_points = num_valid_points
                 R, T = possible_R, possible_t
 
-        return R, T
+        return R, T, points3D
 
     def triangulate_points(self, P1, P2, pts1, pts2):
         num_points = pts1.shape[0]
@@ -133,12 +140,12 @@ class PoseEstimator:
 
         for i in range(num_points):
             A = torch.zeros((4, 4), dtype=torch.float32)
-            A[0:2] = pts1[i, 0, 0] * P1[2] - P1[0]
-            A[2:4] = pts1[i, 0, 1] * P1[2] - P1[1]
+            A[0:2] = pts1[i, 0] * P1[2] - P1[0]
+            A[2:4] = pts1[i, 1] * P1[2] - P1[1]
 
             B = torch.zeros((4, 4), dtype=torch.float32)
-            B[0:2] = pts2[i, 0, 0] * P2[2] - P2[0]
-            B[2:4] = pts2[i, 0, 1] * P2[2] - P2[1]
+            B[0:2] = pts2[i, 0] * P2[2] - P2[0]
+            B[2:4] = pts2[i, 1] * P2[2] - P2[1]
 
             C = torch.matmul(A, torch.inverse(B))
 
