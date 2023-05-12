@@ -95,6 +95,7 @@ class PoseEstimator:
         return F_rank2
     
     def recover_pose_lx(self, E, pts1, pts2, K):
+        # import ipdb; ipdb.set_trace()
         K_inv = torch.linalg.inv(K)
 
         U, S, Vh = torch.linalg.svd(E)
@@ -125,6 +126,11 @@ class PoseEstimator:
 
         R_1 = K @ R_hat_1 @ K_inv
         R_2 = K @ R_hat_2 @ K_inv
+
+        # Determine the correct rotation and translation by checking the cheirality condition
+        valid_points = 0
+        R, T = None, None
+        points3D = None
 
         for possible_R, possible_t in [(R_1, T_1), (R_1, T_2), (R_2, T_1), (R_2, T_2)]:
             # Project points into the second camera coordinate system
@@ -176,14 +182,23 @@ class PoseEstimator:
             points3D = self.triangulate_points(P1, P2, pts1, pts2)
 
             # Check the cheirality condition
-            valid_points_mask = points3D[:, 2] > 0
-            num_valid_points = torch.sum(valid_points_mask)
+            points3D_1 = points3D @ torch.eye(3, 4, dtype=torch.float32).T
+            points3D_2 = points3D @ torch.cat((possible_R, possible_t), dim=1).T
+
+            valid_points_mask_1 = points3D_1[:, 2] > 0
+            num_valid_points_1 = torch.sum(valid_points_mask_1)
+
+            valid_points_mask_2 = points3D_2[:, 2] > 0
+            num_valid_points_2 = torch.sum(valid_points_mask_2)
+
+            num_valid_points = num_valid_points_1 + num_valid_points_2
 
             if num_valid_points > valid_points:
                 valid_points = num_valid_points
                 R, T = possible_R, possible_t
+                valid_points3D = points3D
 
-        return R, T, points3D[:, :3]
+        return R, T, valid_points3D[:, :3]
 
     def triangulate_points(self, P1, P2, pts1, pts2):
         num_points = pts1.shape[0]
@@ -197,10 +212,10 @@ class PoseEstimator:
             A[3, :] = pts2[i, 1] * P2[2, :] - P2[1, :]
 
             # Perform SVD on A
-            _, _, Vt = torch.svd(A)
+            _, _, Vt = torch.linalg.svd(A)
 
             # The last column of Vt (transpose of V) gives the solution
-            X = Vt[:, -1]
+            X = Vt[-1]
 
             # Homogeneous to inhomogeneous coordinates
             X = X / X[-1]
