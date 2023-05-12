@@ -39,36 +39,76 @@ def visualize_LAF(img, LAF, img_idx = 0):
     plt.show()
     return
 
-def visualize_reprojection(img, points2D, points3D, R, T, K):
+def compute_reprojection_error(point3d, R, T, K, src_pts, dst_pts):
+    """
+    Input:
+        point3d: array of triangulated 3D points in homo coordinate (N, 4)
+        P1: projection matrix of camera 1 (3, 4)
+        P2: projection matrix of camera 2 (3, 4)
+        src_pts: original 2D image points of camera 1 (N, 2)
+        dst_pts: original 2D image points of camera 2 (N, 2)
+    """
+    
+    """
+    point3D = torch.cat([point3D, torch.tensor([1.]).float()], dim=0)  # Convert to homogeneous coordinates
+    point2D_proj = K @ (R @ point3D + T)
+    point2D_proj = point2D_proj / point2D_proj[2]  # Convert back to inhomogeneous coordinates
+    return torch.norm(point2D - point2D_proj[:2])
+    """
+    # import pdb; pdb.set_trace()
+    N = point3d.shape[0]
+    point3d = torch.hstack((point3d, torch.ones((N, 1))))  # Convert to homogeneous coordinates
+
+    P1 = K @ torch.hstack((torch.eye(3), torch.zeros((3,1))))
+    P2 = K @ torch.hstack((R, T.reshape((3,1))))
+
+    reproj_2d_1 = point3d @ P1.T 
+    reproj_2d_2 = point3d @ P2.T
+
+    reproj_2d_1 = reproj_2d_1 / reproj_2d_1[:, -1].unsqueeze(1)
+    reproj_2d_2 = reproj_2d_2 / reproj_2d_2[:, -1].unsqueeze(1)
+
+    reproj_2d_1 = reproj_2d_1[:, :2]
+    reproj_2d_2 = reproj_2d_2[:, :2]
+
+    distance_1 = torch.sum(torch.norm(reproj_2d_1 - src_pts, p=2, dim=1))
+    distance_2 = torch.sum(torch.norm(reproj_2d_2 - dst_pts, p=2, dim=1))
+
+    return reproj_2d_1, reproj_2d_2, (distance_1 + distance_2)/(2*N)
+
+def visualize_reprojection(img1, img2, src_pts, dst_pts, point3d, R, T, K):
     """Visualize the reprojection errors for multiple points on the image."""
-    fig, ax = plt.subplots(1)
-    ax.imshow(img)
+    # Create a figure and set up subplots
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
 
-    # Convert points to homogeneous coordinates for projection
-    # points3D = points3D[:, :3] / points3D[:, 3:]
+    axs[0].imshow(img1)
+    axs[1].imshow(img2)
 
-    # Reproject 3D points to 2D
-    points2D_proj = (K @ (R @ points3D.T + T)).T
-    points2D_proj = points2D_proj / points2D_proj[:, 2:]  # Convert back to inhomogeneous coordinates
+    reproj_2d_1, reproj_2d_2, err = compute_reprojection_error(point3d, R, T, K, src_pts, dst_pts)
 
     # Convert tensors to numpy arrays for visualization
-    points2D = points2D.detach().numpy()
-    points2D_proj = points2D_proj.detach().numpy()
+    src_pts = src_pts.detach().numpy()
+    dst_pts = dst_pts.detach().numpy()
+    reproj_2d_1 = reproj_2d_1.detach().numpy()
+    reproj_2d_2 = reproj_2d_2.detach().numpy()
+
 
     # Calculate reprojection error
-    error = np.sum(np.sqrt(np.sum((points2D - points2D_proj[:, :2]) ** 2, axis=1)))
-    print(f'Average Reprojection Error: {np.mean(error)}')
+    print(f'Average Reprojection Error: {err}')
     
-    for i in range(points2D.shape[0]):
+    for i, (points2d, points2d_proj) in enumerate([(src_pts, reproj_2d_1),(dst_pts, reproj_2d_2)]):
         # Draw the original and reprojected points
-        ax.plot(points2D[i, 0], points2D[i, 1], 'bo')  # Original point in blue
-        ax.plot(points2D_proj[i, 0], points2D_proj[i, 1], 'ro')  # Reprojected point in red
+        axs[i].plot(points2d[:, 0], points2d[:, 1], 'bo')  # Original point in blue
+        axs[i].plot(points2d_proj[:, 0], points2d_proj[:, 1], 'ro')  # Reprojected point in red
 
         # Draw a line between original and reprojected points
-        ax.plot([points2D[i, 0], points2D_proj[i, 0]], [points2D[i, 1], points2D_proj[i, 1]], 'g-')  # Error line in green
+        axs[i].plot([points2d[:, 0], points2d_proj[:, 0]], [points2d[:, 1], points2d_proj[:, 1]], 'g-')  # Error line in green
+        axs[i].axis('off')
 
+    plt.tight_layout()
     plt.show()
-    return error
+
+    return err
 
 # drawMatches numpy version
 def draw_matches(img1, kp1, img2, kp2, matches, inliers): 
