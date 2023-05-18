@@ -76,7 +76,7 @@ def compute_reprojection_error(point3d, R, T, K, src_pts, dst_pts):
 
     return reproj_2d_1, reproj_2d_2, (distance_1 + distance_2)/(2*N)
 
-def visualize_reprojection(img1, img2, src_pts, dst_pts, point3d, R, T, K):
+def visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_2):
     """Visualize the reprojection errors for multiple points on the image."""
     # Create a figure and set up subplots
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
@@ -84,17 +84,11 @@ def visualize_reprojection(img1, img2, src_pts, dst_pts, point3d, R, T, K):
     axs[0].imshow(img1)
     axs[1].imshow(img2)
 
-    reproj_2d_1, reproj_2d_2, err = compute_reprojection_error(point3d, R, T, K, src_pts, dst_pts)
-
     # Convert tensors to numpy arrays for visualization
     src_pts = src_pts.detach().numpy()
     dst_pts = dst_pts.detach().numpy()
     reproj_2d_1 = reproj_2d_1.detach().numpy()
     reproj_2d_2 = reproj_2d_2.detach().numpy()
-
-
-    # Calculate reprojection error
-    print(f'Average Reprojection Error: {err}')
     
     for i, (points2d, points2d_proj) in enumerate([(src_pts, reproj_2d_1),(dst_pts, reproj_2d_2)]):
         # Draw the original and reprojected points
@@ -106,9 +100,11 @@ def visualize_reprojection(img1, img2, src_pts, dst_pts, point3d, R, T, K):
         axs[i].axis('off')
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig('output/reproj_err.png')
+    plt.close()
+    # plt.show()
 
-    return err
+    return 
 
 # drawMatches numpy version
 def draw_matches(img1, kp1, img2, kp2, matches, inliers): 
