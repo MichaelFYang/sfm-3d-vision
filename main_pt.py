@@ -4,12 +4,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from feature_extractor_pt import FeatureExtractor, FeatureMatcher
 from pose_estimiation_pt import PoseEstimator
+from bundle_adjuster_pt import BundleAdjuster
 
 import kornia as K
 
-from utils import get_pinhole_intrinsic_params, draw_matches, visualize_reprojection
+from utils import get_pinhole_intrinsic_params, draw_matches, visualize_reprojection, compute_reprojection_error
 import os
 import argparse
+
+# from torchviz import make_dot, make_dot_from_trace
+import time
 
 def read_args():
     parser = argparse.ArgumentParser()
@@ -17,6 +21,8 @@ def read_args():
     return parser.parse_args()
 
 def main():
+    # set the seed to make each run deterministic
+    torch.manual_seed(42)
     flags = read_args()
     dataset_name = flags.dataset
 
@@ -75,9 +81,44 @@ def main():
     R, T, point3d = pose_estimator.recover_pose(Em, src_pts, dst_pts, mtx_torch)
     # R, T, point3d = K.geometry.epipolar.motion_from_essential_choose_solution(Em, mtx_torch, mtx_torch, src_pts, dst_pts, mask=None)
 
-    # visualize reprojection on the second image
-    reproject_error = visualize_reprojection(img1, img2, src_pts, dst_pts, point3d, R, T, mtx_torch)
+    reproj_2d_1, reproj_2d_2, err = compute_reprojection_error(point3d, R, T, mtx_torch, src_pts, dst_pts)
     
+    # print reprojection error
+    print('Average reprojection error: {}'.format(err))
+
+    # visualize projection
+    visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_2)
+
+    # create leaf nodes that require grad for R, T, point3d
+    R_opt = R.clone().detach().requires_grad_(True)
+    T_opt = T.clone().detach().requires_grad_(True)
+    point3d_opt = point3d.clone().detach().requires_grad_(True)
+
+    # init Trainer
+    bundle_adjuster = BundleAdjuster(R_opt, T_opt, point3d_opt, mtx_torch, src_pts.detach(), dst_pts.detach(), optimizer='adam')
+
+    num_iters = 50
+
+    start_time = time.time()
+
+    for _ in range(num_iters):
+        # train
+        reproj_2d_1, reproj_2d_2, err = bundle_adjuster.adjust_step()
+
+        # check
+        # make_dot(err, params={'R': R_opt, 'T': T_opt, 'point3d': point3d_opt}).render("err_torchviz", format="png")
+
+        # print reprojection error
+        print('Average reprojection error: {}'.format(err))
+
+        # visualize projection
+        visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_2)
+    
+    end_time = time.time()
+    execution_time = end_time - start_time
+
+    print("Execution time: ", execution_time, " seconds")
+
     point3d = point3d.detach().numpy()
     # Visualize 3D points
     fig = plt.figure()
@@ -86,12 +127,12 @@ def main():
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-    plt.savefig('output/3d_points.png')
+    plt.savefig('output/3d_points_opt.png')
 
-    fig2 = plt.figure()
-    new_img = draw_matches(img1, kp1[0, :, :, 2].data.cpu().numpy(), img2, kp2[0, :, :, 2].data.cpu().numpy(), matches.data.cpu().numpy(), inliers)
-    plt.imshow(new_img)
-    plt.savefig('output/matches.png')
+    # fig2 = plt.figure()
+    # new_img = draw_matches(img1, kp1[0, :, :, 2].data.cpu().numpy(), img2, kp2[0, :, :, 2].data.cpu().numpy(), matches.data.cpu().numpy(), inliers)
+    # plt.imshow(new_img)
+    # plt.savefig('output/matches.png')
     # plt.show()
 
 
