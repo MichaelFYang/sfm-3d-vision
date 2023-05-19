@@ -29,7 +29,7 @@ def main():
     
     # read K from calibration file
     mtx = get_pinhole_intrinsic_params(calibration_file_dir)
-    mtx = torch.tensor(mtx, requires_grad=True).float()
+    mtx = torch.tensor(mtx, requires_grad=True).detach().float()
     dist = torch.zeros(5, requires_grad=True)
 
     interval = 10
@@ -69,7 +69,7 @@ def main():
         # make_dot(err, params={'R': R, 'T': T, 'point3d': point3d}).render("err_torchviz", format="png")
 
         # visualize projection
-        visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_2)
+        # visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_2)
 
         err.backward()
         optimizer.step()
