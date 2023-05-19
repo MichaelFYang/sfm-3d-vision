@@ -69,12 +69,24 @@ def main():
     # scores, matches = K.feature.match_fginn(des1, des2, kp1, kp2, mutual=True)
 
     # Now RANSAC
-    src_pts = kp1[0, matches[:,0], :, 2].float().detach().requires_grad_(True)
-    dst_pts = kp2[0, matches[:,1], :, 2].float().detach().requires_grad_(True)
+    src_pts = kp1[0, matches[:,0], :, 2].float()
+    dst_pts = kp2[0, matches[:,1], :, 2].float()
 
-    pixel_opt = PixelAdjuster(src_pts=src_pts, dst_pts=dst_pts, K=mtx_torch)
+    _, inliers = pose_estimator.compute_fundametal_matrix_kornia(src_pts, dst_pts)
+    src_pts = src_pts[inliers]
+    dst_pts = dst_pts[inliers]
+    
+    # add noise to src_pts and dst_pts
+    noise_std_dev_pts = 1.0  # set your noise standard deviation for points
+    src_pts_noise = torch.normal(mean=0., std=noise_std_dev_pts, size=src_pts.shape) * 10
+    dst_pts_noise = torch.normal(mean=0., std=noise_std_dev_pts, size=dst_pts.shape) * 10
 
-    num_iters = 2000
+    src_pts_noisy = src_pts + src_pts_noise
+    dst_pts_noisy = dst_pts + dst_pts_noise
+
+    pixel_opt = PixelAdjuster(src_pts=src_pts_noisy, dst_pts=dst_pts_noisy, K=mtx_torch)
+
+    num_iters = 100
 
     start_time = time.time()
 

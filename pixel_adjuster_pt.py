@@ -1,4 +1,5 @@
 import torch
+import pypose as pp
 import kornia as K
 from utils import compute_reprojection_error
 
@@ -18,10 +19,10 @@ class PixelAdjuster:
         - optimizer: optimizer to use (adam or LBFGS)
         """
 
-        self.src_pts = src_pts
-        self.dst_pts = dst_pts
+        self.src_pts = src_pts.detach().requires_grad_(True)
+        self.dst_pts = dst_pts.detach().requires_grad_(True)
 
-        self.optimizer = torch.optim.Adam([self.src_pts, self.dst_pts], lr=1e-3)
+        self.optimizer = torch.optim.Adam([self.src_pts, self.dst_pts], lr=1e-5)
             
         self.loss = compute_reprojection_error
         self.K = K
@@ -31,9 +32,7 @@ class PixelAdjuster:
         Perform one adjustment step.
 
         """
-        Fm, inliers = pose_estimator.compute_fundametal_matrix_kornia(self.src_pts, self.dst_pts)
-        self.src_pts = self.src_pts[inliers]
-        self.dst_pts = self.dst_pts[inliers]
+        Fm, _ = pose_estimator.compute_fundametal_matrix_kornia(self.src_pts, self.dst_pts)
 
         Em = K.geometry.essential_from_fundamental(Fm, self.K, self.K)
         R, T, point3d = pose_estimator.recover_pose(Em, self.src_pts, self.dst_pts, self.K)
