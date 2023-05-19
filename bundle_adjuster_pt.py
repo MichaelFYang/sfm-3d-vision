@@ -41,7 +41,7 @@ class BundleAdjuster:
                 self.optimizer.zero_grad()
 
                 # compute reprojection error
-                reproj_2d_1, reproj_2d_2, err = self.loss(self.point3d_opt, self.R_opt, self.T_opt, self.K, self.src_pts, self.dst_pts)
+                reproj_2d_1, reproj_2d_2, err = self.loss(self.point3d_opt, self.src_pts, self.dst_pts, R=self.R_opt, T=self.T_opt, K=self.K)
                 
                 # update R, T, point3d
                 err.backward()
@@ -49,13 +49,13 @@ class BundleAdjuster:
 
             self.optimizer.step(closure)
             with torch.no_grad():
-                reproj_2d_1, reproj_2d_2, err = self.loss(self.point3d_opt, self.R_opt, self.T_opt, self.K, self.src_pts, self.dst_pts)
+                reproj_2d_1, reproj_2d_2, err = self.loss(self.point3d_opt, self.src_pts, self.dst_pts, R=self.R_opt, T=self.T_opt, K=self.K)
         else:
             # clear gradients for this training step
             self.optimizer.zero_grad()
 
             # compute reprojection error
-            reproj_2d_1, reproj_2d_2, err = self.loss(self.point3d_opt, self.R_opt, self.T_opt, self.K, self.src_pts, self.dst_pts)
+            reproj_2d_1, reproj_2d_2, err = self.loss(self.point3d_opt, self.src_pts, self.dst_pts, R=self.R_opt, T=self.T_opt, K=self.K) 
             
             # update R, T, point3d
             err.backward()
