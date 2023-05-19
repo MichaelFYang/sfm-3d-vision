@@ -1,4 +1,5 @@
 import torch
+import pypose as pp
 from utils import compute_reprojection_error
 
 class BundleAdjuster:
@@ -20,7 +21,7 @@ class BundleAdjuster:
         self.point3d_opt = point3d_opt
 
         if optimizer == 'adam':
-            self.optimizer = torch.optim.Adam([self.P, self.point3d_opt], lr=5e-3)
+            self.optimizer = torch.optim.Adam([self.P, self.point3d_opt], lr=1e-3)
         elif optimizer == 'LBFGS':
             self.optimizer = torch.optim.LBFGS([self.P, self.point3d_opt], lr=0.1)
             

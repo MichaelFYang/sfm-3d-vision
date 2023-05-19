@@ -1,7 +1,9 @@
 import numpy as np
+import pypose as pp
 import kornia as K
 import matplotlib.pyplot as plt
 import cv2
+import math
 import torch
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -30,6 +32,33 @@ def get_pinhole_intrinsic_params(calibration_file_dir):
 
         K = np.array(K, dtype=np.float)
     return K
+
+def get_noise_rotation(noise_std_dev):
+    noise_rad = torch.normal(mean=0., std=noise_std_dev, size=(3,))  # in radians
+    noise_rad_x, noise_rad_y, noise_rad_z = noise_rad[0], noise_rad[1], noise_rad[2]
+    
+    Rx = torch.tensor([
+        [1, 0, 0],
+        [0, math.cos(noise_rad_x), -math.sin(noise_rad_x)],
+        [0, math.sin(noise_rad_x), math.cos(noise_rad_x)],
+    ])
+
+    Ry = torch.tensor([
+        [math.cos(noise_rad_y), 0, math.sin(noise_rad_y)],
+        [0, 1, 0],
+        [-math.sin(noise_rad_y), 0, math.cos(noise_rad_y)],
+    ])
+
+    Rz = torch.tensor([
+        [math.cos(noise_rad_z), -math.sin(noise_rad_z), 0],
+        [math.sin(noise_rad_z), math.cos(noise_rad_z), 0],
+        [0, 0, 1],
+    ])
+
+    noise_rotation_matrix = Rz.matmul(Ry).matmul(Rx)
+
+    return noise_rotation_matrix
+
 
 #Lets define some functions for local feature matching
 def visualize_LAF(img, LAF, img_idx = 0):
@@ -64,8 +93,11 @@ def compute_reprojection_error(point3d, src_pts, dst_pts, R=None, T=None, K=None
         P2 = K @ torch.hstack((R, T.reshape((3,1))))
         reproj_2d_2 = point3d @ P2.T
     else:
-        reproj_2d_2 = P @ point3d
-        reproj_2d_2 = (K @ reproj_2d_2[:,:-1].T).T
+        if pp.is_lietensor(P):
+            reproj_2d_2 = P @ point3d
+            reproj_2d_2 = (K @ reproj_2d_2[:,:-1].T).T
+        else:
+            reproj_2d_2 = (K @ P @ point3d.T).T
 
     reproj_2d_1 = point3d @ P1.T 
     
