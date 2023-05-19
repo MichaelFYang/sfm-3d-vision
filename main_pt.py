@@ -82,7 +82,6 @@ def main():
     R, T, point3d = pose_estimator.recover_pose(Em, src_pts, dst_pts, mtx_torch)
     # R, T, point3d = K.geometry.epipolar.motion_from_essential_choose_solution(Em, mtx_torch, mtx_torch, src_pts, dst_pts, mask=None)
 
-
     R_noise = get_noise_rotation(1.0)  # set your noise standard deviation
     R_noisy = R.matmul(R_noise)
 
@@ -134,7 +133,8 @@ def main():
         err_normal_all.append(err_normal.item())
 
     # visualize projection
-    visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1_normal, reproj_2d_2_normal)
+    visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1_normal, reproj_2d_2_normal, key='normal')
+    visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1_Lie, reproj_2d_2_Lie, key='Lie')
     
     end_time = time.time()
     execution_time = end_time - start_time

@@ -113,7 +113,7 @@ def compute_reprojection_error(point3d, src_pts, dst_pts, R=None, T=None, K=None
 
     return reproj_2d_1, reproj_2d_2, (distance_1 + distance_2)/(2*N)
 
-def visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_2):
+def visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_2, key=None):
     """Visualize the reprojection errors for multiple points on the image."""
     # Create a figure and set up subplots
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
@@ -137,7 +137,7 @@ def visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_
         axs[i].axis('off')
 
     plt.tight_layout()
-    plt.savefig('output/reproj_err.png')
+    plt.savefig(f'output/reproj_err_{key}.png')
     plt.close()
     # plt.show()
 
