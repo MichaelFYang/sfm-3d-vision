@@ -1,5 +1,6 @@
 import torch
 import kornia as K
+import numpy as np
 
 import matplotlib.pyplot as plt
 
@@ -7,8 +8,16 @@ from utils import visualize_LAF
 
 class FeatureExtractor:
     def __init__(self, mtx, dist, method='sift'):
-        self.mtx = torch.tensor(mtx, dtype=torch.float32)
-        self.dist = torch.tensor(dist, dtype=torch.float32)
+        if isinstance(mtx, np.ndarray):
+            self.mtx = torch.tensor(mtx, dtype=torch.float32, requires_grad=True)
+        else:
+            self.mtx = mtx
+
+        if isinstance(dist, np.ndarray):
+            self.dist = torch.tensor(dist, dtype=torch.float32, requires_grad=True)
+        else:
+            self.dist = dist
+
         self.method = method
         
         if method == 'sift':
@@ -20,6 +29,7 @@ class FeatureExtractor:
             scale_pyr = K.geometry.ScalePyramid(min_size=self.patch_size, double_image=True)
             nms = K.geometry.ConvQuadInterp3d()
             n_features = 500
+            # n_features = 100
             self.detector = K.feature.ScaleSpaceDetector(n_features,
                                         resp_module=resp,
                                         scale_space_response=True,#We need that, because DoG operates on scale-space

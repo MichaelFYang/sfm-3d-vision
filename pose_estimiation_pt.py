@@ -1,5 +1,6 @@
 import torch
 import kornia as K
+import numpy as np
 
 class PoseEstimator:
     def __init__(self, mtx, dist, method='ransac'):
@@ -33,7 +34,10 @@ class PoseEstimator:
         pts2 = torch.tensor([kp2[m.trainIdx].pt for m in matches], dtype=torch.float32).unsqueeze(1)
 
         # Convert camera matrix to PyTorch tensor
-        K = torch.tensor(self.mtx, dtype=torch.float32)
+        if isinstance(self.mtx, np.ndarray):
+            K = torch.tensor(self.mtx, dtype=torch.float32, requires_grad=True)
+        else:
+            K = self.mtx
 
         # Estimate essential matrix and recover pose
         E = self.essential_matrix(pts1, pts2, K)
