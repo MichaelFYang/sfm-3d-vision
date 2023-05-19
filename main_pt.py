@@ -81,10 +81,13 @@ def main():
     R, T, point3d = pose_estimator.recover_pose(Em, src_pts, dst_pts, mtx_torch)
     # R, T, point3d = K.geometry.epipolar.motion_from_essential_choose_solution(Em, mtx_torch, mtx_torch, src_pts, dst_pts, mask=None)
 
-    reproj_2d_1, reproj_2d_2, err = compute_reprojection_error(point3d, R, T, mtx_torch, src_pts, dst_pts)
+    reproj_2d_1, reproj_2d_2, err = compute_reprojection_error(point3d, src_pts, dst_pts, R=R, T=T, K=mtx_torch)
     
     # print reprojection error
     print('Average reprojection error: {}'.format(err))
+
+    # visualize the computation graph of one pass
+    # make_dot(err, params={'R': R, 'T': T, 'point3d': point3d}).render("err_torchviz", format="png")
 
     # visualize projection
     visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_2)
