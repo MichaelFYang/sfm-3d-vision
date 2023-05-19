@@ -8,3 +8,5 @@ dataset/
 exercise4_solution/
 */.DS_Store
 err_torchviz.png
+*.pt
+main_sequence_pt.py
