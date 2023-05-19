@@ -22,7 +22,7 @@ class PixelAdjuster:
         self.src_pts = src_pts.detach().requires_grad_(True)
         self.dst_pts = dst_pts.detach().requires_grad_(True)
 
-        self.optimizer = torch.optim.Adam([self.src_pts, self.dst_pts], lr=1e-5)
+        self.optimizer = torch.optim.Adam([self.src_pts, self.dst_pts], lr=1e-3)
             
         self.loss = compute_reprojection_error
         self.K = K
@@ -32,7 +32,8 @@ class PixelAdjuster:
         Perform one adjustment step.
 
         """
-        Fm, _ = pose_estimator.compute_fundametal_matrix_kornia(self.src_pts, self.dst_pts)
+        # Fm, _ = pose_estimator.compute_fundametal_matrix_kornia(self.src_pts, self.dst_pts)
+        Fm = K.geometry.find_fundamental(self.src_pts[None, ...], self.dst_pts[None, ...])[0, ...]
 
         Em = K.geometry.essential_from_fundamental(Fm, self.K, self.K)
         R, T, point3d = pose_estimator.recover_pose(Em, self.src_pts, self.dst_pts, self.K)
@@ -42,7 +43,6 @@ class PixelAdjuster:
         
         # update R, T, point3d
         
-        self.optimizer.zero_grad()
         err.backward()
         self.optimizer.step()
 
