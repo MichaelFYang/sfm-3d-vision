@@ -46,4 +46,4 @@ class PixelAdjuster:
         err.backward()
         self.optimizer.step()
 
-        return reproj_2d_1, reproj_2d_2, err
+        return reproj_2d_1, reproj_2d_2, err, self.src_pts, self.dst_pts

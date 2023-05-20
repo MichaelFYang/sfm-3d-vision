@@ -86,7 +86,7 @@ def main():
 
     pixel_opt = PixelAdjuster(src_pts=src_pts_noisy, dst_pts=dst_pts_noisy, K=mtx_torch)
 
-    num_iters = 5000
+    num_iters = 150
 
     start_time = time.time()
 
@@ -94,7 +94,7 @@ def main():
 
     for i in range(num_iters):
         # train
-        reproj_2d_1_normal, reproj_2d_2_normal, err_normal = pixel_opt.adjust_step(pose_estimator)
+        reproj_2d_1_normal, reproj_2d_2_normal, err_normal, src_pts, dst_pts = pixel_opt.adjust_step(pose_estimator)
 
         # check
         # make_dot(err, params={'R': R_opt, 'T': T_opt, 'point3d': point3d_opt}).render("err_torchviz", format="png")
