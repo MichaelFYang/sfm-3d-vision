@@ -57,6 +57,7 @@ def main():
     # Add noise to the intrinsic matrix
     # mtx_noisy = mtx + noise
     # print(mtx_noisy)
+    
 
     # initialize optimizer
     optimizer = torch.optim.Adam([mtx], lr=5e-3)
@@ -66,7 +67,6 @@ def main():
 
         optimizer.zero_grad()
         
-        # SfM = StructurefromMotion(mtx, dist)
         SfM = StructurefromMotion(mtx, dist)
 
         err, R, T, point3d, src_pts, dst_pts, reproj_2d_1, reproj_2d_2 = SfM.forward(img1, img2)

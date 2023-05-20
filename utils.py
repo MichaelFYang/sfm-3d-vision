@@ -60,8 +60,9 @@ def compute_reprojection_error(point3d, src_pts, dst_pts, R=None, T=None, K=None
     N = point3d.shape[0]
     point3d = torch.hstack((point3d, torch.ones((N, 1))))  # Convert to homogeneous coordinates
     
+    P1 = K @ torch.hstack((torch.eye(3), torch.zeros((3,1))))
+
     if R is not None and T is not None and K is not None:
-        P1 = K @ torch.hstack((torch.eye(3), torch.zeros((3,1))))
         P2 = K @ torch.hstack((R, T.reshape((3,1))))
 
     reproj_2d_1 = point3d @ P1.T 
