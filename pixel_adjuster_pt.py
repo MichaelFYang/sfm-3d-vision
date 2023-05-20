@@ -22,7 +22,7 @@ class PixelAdjuster:
         self.src_pts = src_pts.detach().requires_grad_(True)
         self.dst_pts = dst_pts.detach().requires_grad_(True)
 
-        self.optimizer = torch.optim.Adam([self.src_pts, self.dst_pts], lr=1e-3)
+        self.optimizer = torch.optim.Adam([self.src_pts, self.dst_pts], lr=5e-3)
             
         self.loss = compute_reprojection_error
         self.K = K
@@ -38,10 +38,12 @@ class PixelAdjuster:
         Em = K.geometry.essential_from_fundamental(Fm, self.K, self.K)
         R, T, point3d = pose_estimator.recover_pose(Em, self.src_pts, self.dst_pts, self.K)
 
+        # LieTensor 
+        P = torch.cat([R, T], dim=1)
+        P_pp = pp.from_matrix(P, ltype=pp.SE3_type)
+
         # compute reprojection error
-        reproj_2d_1, reproj_2d_2, err = self.loss(point3d, self.src_pts, self.dst_pts, R=R, T=T, K=self.K) 
-        
-        # update R, T, point3d
+        reproj_2d_1, reproj_2d_2, err = self.loss(point3d, self.src_pts, self.dst_pts, P=P_pp, K=self.K)
         
         err.backward()
         self.optimizer.step()

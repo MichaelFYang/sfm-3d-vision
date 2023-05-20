@@ -77,7 +77,7 @@ def main():
     dst_pts = dst_pts[inliers]
     
     # add noise to src_pts and dst_pts
-    noise_std_dev_pts = 0.0  # set your noise standard deviation for points
+    noise_std_dev_pts = 0.5  # set your noise standard deviation for points
     src_pts_noise = torch.normal(mean=0., std=noise_std_dev_pts, size=src_pts.shape) * 10
     dst_pts_noise = torch.normal(mean=0., std=noise_std_dev_pts, size=dst_pts.shape) * 10
 
@@ -86,7 +86,7 @@ def main():
 
     pixel_opt = PixelAdjuster(src_pts=src_pts_noisy, dst_pts=dst_pts_noisy, K=mtx_torch)
 
-    num_iters = 150
+    num_iters = 500
 
     start_time = time.time()
 
@@ -113,7 +113,7 @@ def main():
     print("Execution time: ", execution_time, " seconds")
 
     # Create the plot
-    plt.plot(err_normal_all, label='Normal')
+    plt.plot(err_normal_all, label='Lie')
 
     # Add labels and title
     plt.xlabel('Epochs')
