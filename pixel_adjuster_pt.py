@@ -27,7 +27,7 @@ class PixelAdjuster:
         self.loss = compute_reprojection_error
         self.K = K
 
-    def adjust_step(self, pose_estimator):
+    def adjust_step(self, pose_estimator, mode="Lie"):
         """
         Perform one adjustment step.
 
@@ -41,9 +41,12 @@ class PixelAdjuster:
         # LieTensor 
         P = torch.cat([R, T], dim=1)
         P_pp = pp.from_matrix(P, ltype=pp.SE3_type)
-
-        # compute reprojection error
-        reproj_2d_1, reproj_2d_2, err = self.loss(point3d, self.src_pts, self.dst_pts, P=P_pp, K=self.K)
+        if mode == "Lie":
+            # compute reprojection error
+            reproj_2d_1, reproj_2d_2, err = self.loss(point3d, self.src_pts, self.dst_pts, P=P_pp, K=self.K)
+        else:
+            # compute reprojection error
+            reproj_2d_1, reproj_2d_2, err = self.loss(point3d, self.src_pts, self.dst_pts, P=P, K=self.K)
         
         err.backward()
         self.optimizer.step()

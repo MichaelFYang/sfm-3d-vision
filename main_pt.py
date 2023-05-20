@@ -61,59 +61,110 @@ def main():
     numpy array of size (num_keypoints x descriptor_size)
     '''
     # import ipdb; ipdb.set_trace()
-    kp1, des1 = feature_extractor.extract(img1)
-    kp2, des2 = feature_extractor.extract(img2)
+    num_runs = 1
+    err_lie_all_runs = []
+    err_normal_all_runs = []
+    for i_run in range(num_runs):
+        print('Run {}'.format(i_run))
+        kp1, des1 = feature_extractor.extract(img1)
+        kp2, des2 = feature_extractor.extract(img2)
     
-    # scores, matches = K.feature.match_snn(des1, des2, 0.9)
-    scores, matches = feature_matcher.match(des1, des2, kp1, kp2)
-    # scores, matches = K.feature.match_fginn(des1, des2, kp1, kp2, mutual=True)
+        # scores, matches = K.feature.match_snn(des1, des2, 0.9)
+        scores, matches = feature_matcher.match(des1, des2, kp1, kp2)
+        # scores, matches = K.feature.match_fginn(des1, des2, kp1, kp2, mutual=True)
 
-    # Now RANSAC
-    src_pts = kp1[0, matches[:,0], :, 2].float()
-    dst_pts = kp2[0, matches[:,1], :, 2].float()
+        # Now RANSAC
+        src_pts = kp1[0, matches[:,0], :, 2].float()
+        dst_pts = kp2[0, matches[:,1], :, 2].float()
 
-    _, inliers = pose_estimator.compute_fundametal_matrix_kornia(src_pts, dst_pts)
-    src_pts = src_pts[inliers]
-    dst_pts = dst_pts[inliers]
+        _, inliers = pose_estimator.compute_fundametal_matrix_kornia(src_pts, dst_pts)
+        src_pts = src_pts[inliers]
+        dst_pts = dst_pts[inliers]
+
+        # add noise to src_pts and dst_pts
+        noise_std_dev_pts = 0.5  # set your noise standard deviation for points
+        src_pts_noise = torch.normal(mean=0., std=noise_std_dev_pts, size=src_pts.shape) * 10
+        dst_pts_noise = torch.normal(mean=0., std=noise_std_dev_pts, size=dst_pts.shape) * 10
+
+        src_pts_noisy = src_pts + src_pts_noise
+        dst_pts_noisy = dst_pts + dst_pts_noise
+
+        src_pts_noisy_lie = src_pts_noisy.clone().detach().requires_grad_(True)
+        dst_pts_noisy_lie = dst_pts_noisy.clone().detach().requires_grad_(True)
+
+        pixel_opt_normal = PixelAdjuster(src_pts=src_pts_noisy, dst_pts=dst_pts_noisy, K=mtx_torch)
+        pixel_opt_lie = PixelAdjuster(src_pts=src_pts_noisy_lie, dst_pts=dst_pts_noisy_lie, K=mtx_torch)
+        
+        num_iters = 500
+
+        start_time = time.time()
+
+        err_normal_all = []
+        err_lie_all = []
+
+        for i in range(num_iters):
+            # train
+            # reproj_2d_1_normal, reproj_2d_2_normal, err_normal, src_pts, dst_pts = pixel_opt_normal.adjust_step(pose_estimator, mode="normal")
+            reproj_2d_1_lie, reproj_2d_2_lie, err_lie, src_pts_lie, dst_pts_lie = pixel_opt_lie.adjust_step(pose_estimator, mode="Lie")
+            
+            
+            # visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1_normal, reproj_2d_2_normal, key='normal_live_noise{}'.format(noise_std_dev_pts))
+            if i % 10 == 0:
+                visualize_reprojection(img1, img2, src_pts_lie, dst_pts_lie, reproj_2d_1_lie, reproj_2d_2_lie, key='lie_live_noise{}'.format(noise_std_dev_pts))
+            # check
+            # make_dot(err, params={'R': R_opt, 'T': T_opt, 'point3d': point3d_opt}).render("err_torchviz", format="png")
+
+            # print reprojection error
+            print('==================== {}th Epoch ===================='.format(i))
+            # print('Normal average reprojection error: {}'.format(err_normal))
+            print('Lie average reprojection error: {}'.format(err_lie))
+
+            # err_normal_all.append(err_normal.item())
+            err_lie_all.append(err_lie.item())
+
+        # visualize projection
+        # visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1_normal, reproj_2d_2_normal, key='normal_last_noise{}'.format(noise_std_dev_pts))
+        # visualize_reprojection(img1, img2, src_pts_lie, dst_pts_lie, reproj_2d_1_lie, reproj_2d_2_lie, key='lie_last_noise{}'.format(noise_std_dev_pts))
+        
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print("Execution time: ", execution_time, " seconds")
+
+        err_lie_all_runs.append(err_lie_all)
+        err_normal_all_runs.append(err_normal_all)
     
-    # add noise to src_pts and dst_pts
-    noise_std_dev_pts = 0.5  # set your noise standard deviation for points
-    src_pts_noise = torch.normal(mean=0., std=noise_std_dev_pts, size=src_pts.shape) * 10
-    dst_pts_noise = torch.normal(mean=0., std=noise_std_dev_pts, size=dst_pts.shape) * 10
+    # # Create a new figure
+    # plt.figure()
 
-    src_pts_noisy = src_pts + src_pts_noise
-    dst_pts_noisy = dst_pts + dst_pts_noise
+    # # Create an array of x-coordinates based on the number of time steps
+    # x_coords = np.arange(len(err_lie_all_runs[0]))
 
-    pixel_opt = PixelAdjuster(src_pts=src_pts_noisy, dst_pts=dst_pts_noisy, K=mtx_torch)
+    # # Calculate the mean line
+    # mean_normal_all_runs = np.mean(err_normal_all_runs, axis=0)
+    # mean_lie_all_runs = np.mean(err_lie_all_runs, axis=0)
 
-    num_iters = 500
+    # # Create a filled region between the lines
+    # plt.fill_between(x_coords, np.min(err_lie_all_runs, axis=0), np.max(err_lie_all_runs, axis=0), alpha=0.2)
+    # plt.fill_between(x_coords, np.min(err_normal_all_runs, axis=0), np.max(err_normal_all_runs, axis=0), alpha=0.2)
 
-    start_time = time.time()
+    # # Plot the mean line
+    # plt.plot(x_coords, mean_lie_all_runs, color='blue', linewidth=2, label='Lie')
+    # plt.plot(x_coords, mean_normal_all_runs, color='red', linewidth=2, label='Normal')
 
-    err_normal_all = []
+    # # Set plot title and labels
+    # plt.title('Optimizing Pixel Coordinates (Pixel Noise: {})'.format(noise_std_dev_pts))
+    # plt.xlabel('Epochs')
+    # plt.ylabel('Reprojection Error')
 
-    for i in range(num_iters):
-        # train
-        reproj_2d_1_normal, reproj_2d_2_normal, err_normal, src_pts, dst_pts = pixel_opt.adjust_step(pose_estimator)
+    # # Add legend
+    # plt.legend()
 
-        # check
-        # make_dot(err, params={'R': R_opt, 'T': T_opt, 'point3d': point3d_opt}).render("err_torchviz", format="png")
-
-        # print reprojection error
-        print('==================== {}th Epoch ===================='.format(i))
-        print('Normal average reprojection error: {}'.format(err_normal))
-
-        err_normal_all.append(err_normal.item())
-
-    # visualize projection
-    visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1_normal, reproj_2d_2_normal, key='normal')
-    
-    end_time = time.time()
-    execution_time = end_time - start_time
-    print("Execution time: ", execution_time, " seconds")
+    # # Display the plot
+    # plt.show()
 
     # Create the plot
-    plt.plot(err_normal_all, label='Lie')
+    plt.plot(err_lie_all, label='Lie')
+    plt.plot(err_normal_all, label='Normal')
 
     # Add labels and title
     plt.xlabel('Epochs')
