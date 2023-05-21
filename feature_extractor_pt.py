@@ -82,7 +82,7 @@ class FeatureExtractor:
 
 
 class FeatureMatcher:
-    def __init__(self, matcher='fginn'):
+    def __init__(self, matcher='adalam'):
         """
         Constructor for FeatureMatcher class.
 
@@ -102,7 +102,7 @@ class FeatureMatcher:
         Returns:
         - matches: list of matches between keypoints
         """
-        if self.matcher == 'fginn':
-            return K.feature.match_fginn(des1, des2, kp1, kp2, mutual=True)
+        if self.matcher == 'adalam':
+            return K.feature.match_adalam(des1, des2, kp1, kp2)
         else:
             raise ValueError('Invalid feature matcher method: {}'.format(self.matcher))

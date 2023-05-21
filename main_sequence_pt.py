@@ -6,9 +6,7 @@ import matplotlib.pyplot as plt
 from feature_extractor_pt import FeatureExtractor, FeatureMatcher
 from pose_estimiation_pt import PoseEstimator
 
-import kornia as K
-
-from utils import get_pinhole_intrinsic_params, draw_matches, visualize_reprojection, compute_reprojection_error, draw_camera_pose
+from utils import get_pinhole_intrinsic_params
 import os
 import argparse
 
@@ -69,8 +67,10 @@ def main():
     # Initialize map from 2D keypoints to 3D points
     map_2d_to_3d = {}
 
-    interval = 1
-    end = 3
+    interval = 3
+    end = 10
+    prev_kp = None
+    prev_des = None
     pbar = tqdm(enumerate(images_name[:end:interval]), total=len(images_name[:end:interval]))
     # wrap tqdm around the loop to display progress bar
     for i, image_name in pbar:
@@ -83,8 +83,8 @@ def main():
             prev_des = des
         elif i == 1:
             _, matches = feature_matcher.match(prev_des, des, prev_kp, kp)
-            src_pts = prev_kp[0, matches[:,0], :, 2].float()
-            dst_pts = kp[0, matches[:,1], :, 2].float()
+            src_pts = prev_kp[0, matches[:,0], :, 2]
+            dst_pts = kp[0, matches[:,1], :, 2]
 
             Fm, inliers = pose_estimator.compute_fundametal_matrix_kornia(src_pts, dst_pts)
             src_pts = src_pts[inliers]
@@ -100,20 +100,25 @@ def main():
             camera_pose_all.append(R_t_1[:3, 3].data.clone())
 
             P2 = mtx_torch @ R_t_1
-            points3d = pose_estimator.triangulate_points(P1, P2, src_pts, dst_pts)
-            point_3d_all.append(points3d.data.clone())
 
-            map_2d_to_3d = {tuple(pt2d.tolist()): pt3d for pt2d, pt3d in zip(dst_pts, points3d)}
+            points3d, flags = pose_estimator.triangulate_points(P1, P2, src_pts, dst_pts)
+
+            print("Valid 2D-3D correspondences: ", flags.sum().item(), "/", len(flags))
+
+            point_3d_all.append(points3d[flags].data.clone())
+
+            map_2d_to_3d = {tuple(pt2d.tolist()): pt3d for pt2d, pt3d in zip(dst_pts[flags], points3d[flags])}
             P1 = P2.clone()
             
-            prev_kp = kp
-            prev_des = des
+            prev_kp = kp.clone()
+            prev_des = des.clone()
+
         else:
-            _, matches = feature_matcher.match(prev_des, des, prev_kp, kp)
-            src_pts = prev_kp[0, matches[:,0], :, 2].float()
-            dst_pts = kp[0, matches[:,1], :, 2].float()
-            
-            
+            scores, matches = feature_matcher.match(prev_des, des, prev_kp, kp)
+            matches = matches[scores.squeeze(dim=1) > 1e-3, :]
+            src_pts = prev_kp[0, matches[:,0], :, 2]
+            dst_pts = kp[0, matches[:,1], :, 2]
+                   
             # Instead of estimating Fundamental matrix and Essential matrix,
             # check if there are enough 2D-3D correspondences in map_2d_to_3d
             src_pts_3d = [map_2d_to_3d.get(tuple(p.tolist()), None) for p in src_pts]
@@ -122,14 +127,9 @@ def main():
                 # There are enough 2D-3D correspondences, use PnP to estimate pose
                 valid = [p is not None for p in src_pts_3d]
                 dst_pts_2d = dst_pts[valid]
-                src_pts_3d = torch.cat([p.unsqueeze(dim=0) for p in src_pts_3d if p is not None])
+                src_pts_3d_out = torch.cat([p.unsqueeze(dim=0) for p in src_pts_3d if p is not None])
 
-                R_t_1 = K.geometry.solve_pnp_dlt(src_pts_3d[:, :-1].unsqueeze(dim=0), dst_pts_2d.unsqueeze(dim=0), mtx_torch.unsqueeze(dim=0))[0]
-                
-                # src_pts_3d_np = src_pts_3d.detach().numpy()
-                # src_pts_2d_np = src_pts_2d.detach().numpy()
-                # _, R_vec, T = cv2.solvePnP(src_pts_3d_np[:, :-1], src_pts_2d_np, mtx, np.zeros((4,1)))
-                # R, _ = cv2.Rodrigues(R_vec)
+                R_t_1 = K.geometry.solve_pnp_dlt(src_pts_3d_out[:, :-1].unsqueeze(dim=0), dst_pts_2d.unsqueeze(dim=0), mtx_torch.unsqueeze(dim=0), svd_eps=1e-7)[0]
 
                 P2 = mtx_torch @ R_t_1
                 
@@ -141,28 +141,32 @@ def main():
                 # But that's ok, as long as some points can be triangulated, they can be added to the map.
                 try:
                     _, inliers = pose_estimator.compute_fundametal_matrix_kornia(src_pts, dst_pts)
+
                     src_pts = src_pts[inliers]
                     dst_pts = dst_pts[inliers]
-                    
-                    points3d = pose_estimator.triangulate_points(P1, P2, src_pts, dst_pts)
-                    point_3d_all.append(points3d.data.clone())
+
+                    points3d, flags = pose_estimator.triangulate_points(P1, P2, src_pts, dst_pts)
+
+                    print("Valid 2D-3D correspondences: ", flags.sum().item(), "/", len(flags))
+
+                    point_3d_all.append(points3d[flags].data.clone())
 
                     # Update map_2d_to_3d with newly triangulated points
-                    map_2d_to_3d = {tuple(pt2d.tolist()): pt3d for pt2d, pt3d in zip(dst_pts, points3d)}
+                    map_2d_to_3d = {tuple(pt2d.tolist()): pt3d for pt2d, pt3d in zip(dst_pts[flags], points3d[flags])}
 
                 except:
                     pass
 
-                R_t_0 = R_t_1 
                 P1 = P2.clone()
 
-                prev_kp = kp
-                prev_des = des
+                prev_kp = kp.clone()
+                prev_des = des.clone()
+
             else:
                 print('Not enough 2D-3D correspondences, skipping frame')
                 
-    # point_3d_all = torch.cat(point_3d_all, dim=0)
-    point_3d_all = point_3d_all[1]
+    point_3d_all = torch.cat(point_3d_all, dim=0)
+    # point_3d_all = point_3d_all[1]
     # torch.save(point3d, 'point3d_hose_loop_50.pt')
 
     camera_pose_all = torch.stack(camera_pose_all, dim=0)
@@ -173,7 +177,7 @@ def main():
     # Visualize 3D points
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(point_3d_all[:, 0], point_3d_all[:, 1], point_3d_all[:, 2], s=5, cmap='blue') 
+    ax.scatter(point_3d_all[:, 0], point_3d_all[:, 1], point_3d_all[:, 2], s=5) 
     
     # Plot the camera position as a point
     ax.scatter(camera_pose_all[:, 0], camera_pose_all[:, 1], camera_pose_all[:, 2], s=10, color='r')
