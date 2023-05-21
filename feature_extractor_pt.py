@@ -28,8 +28,8 @@ class FeatureExtractor:
             self.descriptor = K.feature.SIFTDescriptor(self.patch_size)
             scale_pyr = K.geometry.ScalePyramid(min_size=self.patch_size, double_image=True)
             nms = K.geometry.ConvQuadInterp3d()
-            # n_features = 500
-            n_features = 5000
+            n_features = 500
+            # n_features = 5000
             self.detector = K.feature.ScaleSpaceDetector(n_features,
                                         resp_module=resp,
                                         scale_space_response=True,#We need that, because DoG operates on scale-space

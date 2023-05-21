@@ -23,7 +23,7 @@ def read_args():
 
 def main():
     # set the seed to make each run deterministic
-    torch.manual_seed(42)
+    # torch.manual_seed(42)
     flags = read_args()
     dataset_name = flags.dataset
 
