@@ -8,7 +8,7 @@ from bundle_adjuster_pt import BundleAdjuster
 
 import kornia as K
 
-from utils import get_pinhole_intrinsic_params, draw_matches, visualize_reprojection, compute_reprojection_error
+from utils import get_pinhole_intrinsic_params, draw_matches, visualize_reprojection, compute_reprojection_error, visualize_LAF
 import os
 import argparse
 
@@ -71,6 +71,15 @@ def main():
     src_pts = kp1[0, matches[:,0], :, 2].float()
     dst_pts = kp2[0, matches[:,1], :, 2].float()
 
+    img1_vis = K.utils.image_to_tensor(img1, keepdim=False).float()/255.
+    # img1_vis = K.color.rgb_to_grayscale(img1_vis)
+
+    img2_vis = K.utils.image_to_tensor(img2, keepdim=False).float()/255.
+    # img2_vis = K.color.rgb_to_grayscale(img2_vis)
+
+    visualize_LAF(img1_vis, kp1[:,matches[:,0]], 0)
+    visualize_LAF(img2_vis, kp2[:,matches[:,1]], 0)
+
     Fm, inliers = pose_estimator.compute_fundametal_matrix_kornia(src_pts, dst_pts)
     src_pts = src_pts[inliers]
     dst_pts = dst_pts[inliers]
@@ -100,7 +109,7 @@ def main():
     # init Trainer
     bundle_adjuster = BundleAdjuster(R_opt, T_opt, point3d_opt, mtx_torch, src_pts.detach(), dst_pts.detach(), optimizer='adam')
 
-    num_iters = 50
+    num_iters = 0
 
     start_time = time.time()
 
@@ -122,21 +131,22 @@ def main():
 
     print("Execution time: ", execution_time, " seconds")
 
-    point3d = point3d.detach().numpy()
+    # point3d = point3d.detach().numpy()
     # Visualize 3D points
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(point3d[:, 0], point3d[:, 1], point3d[:, 2], c='b', marker='o')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    plt.savefig('output/3d_points_opt.png')
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter(point3d[:, 0], point3d[:, 1], point3d[:, 2], c='b', marker='o')
+    # ax.set_xlabel('X')
+    # ax.set_ylabel('Y')
+    # ax.set_zlabel('Z')
+    # plt.savefig('output/3d_points_opt.png')
 
-    # fig2 = plt.figure()
-    # new_img = draw_matches(img1, kp1[0, :, :, 2].data.cpu().numpy(), img2, kp2[0, :, :, 2].data.cpu().numpy(), matches.data.cpu().numpy(), inliers)
-    # plt.imshow(new_img)
+    fig2 = plt.figure()
+    matches_img = draw_matches(img1, kp1[0, :, :, 2].data.cpu().numpy(), img2, kp2[0, :, :, 2].data.cpu().numpy(), matches.data.cpu().numpy(), inliers)
+    plt.imshow(matches_img)
+    plt.axis('off')
     # plt.savefig('output/matches.png')
-    # plt.show()
+    plt.show()
 
 
 if __name__ == '__main__':
