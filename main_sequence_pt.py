@@ -59,8 +59,16 @@ def main():
     P1 =  mtx_torch @ R_t_0
     P2 = torch.empty((3,4))
     point_3d_all = []
+    camera_pose_all = [R_t_0[:3,3]]
 
-    pbar = tqdm(enumerate(images_name[:20:2]), total=len(images_name[:20:2]))
+    # Visualize 3D points
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+
+    # Iterate through frames with interval
+    interval = 10
+    end = 15
+    pbar = tqdm(enumerate(images_name[:end:interval]), total=len(images_name[:end:interval]))
     # wrap tqdm around the loop to display progress bar
     for i, image_name in pbar:
         img_path = os.path.join(images_dir, image_name)
@@ -86,10 +94,21 @@ def main():
 
             R_t_1[:3,:3] = R @ R_t_0[:3,:3]
             R_t_1[:3, 3] = R_t_0[:3, 3] + R_t_0[:3,:3] @ T.ravel()
+
+            # R_t_1[:3, 3] = T.ravel() + R @ R_t_0[:3, 3]
             P2 = mtx_torch @ R_t_1
 
+            camera_pose_all.append(R_t_1[:3, 3].data.clone())
+
             points3d = pose_estimator.triangulate_points(P1, P2, src_pts, dst_pts)
-            point_3d_all.append(points3d)
+
+            # Visualize 3D points in real time
+            # points3d_np = points3d.detach().numpy()
+            # ax.scatter(points3d_np[:, 0], points3d_np[:, 1], points3d_np[:, 2], color='b', s=10) 
+            # plt.pause(0.5)
+            # plt.show()
+
+            point_3d_all.append(points3d.data.clone())
 
             # compute reprojection error and visualize to debug
             # reproj_2d_1, reproj_2d_2, err = compute_reprojection_error(points3d[:,:3], src_pts, dst_pts, P1=P1, P2=P2)
@@ -105,18 +124,31 @@ def main():
             prev_kp = kp
             prev_des = des
 
-    point3d = torch.cat(point_3d_all, dim=0)
+    point_3d_all = torch.cat(point_3d_all, dim=0)
     # torch.save(point3d, 'point3d_hose_loop_50.pt')
 
-    point3d = point3d.detach().numpy()
+    camera_pose_all = torch.stack(camera_pose_all, dim=0)
+
+    point_3d_all = point_3d_all.detach().numpy()
+    camera_pose_all = camera_pose_all.detach().numpy()
 
     # Visualize 3D points
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(point3d[:, 0], point3d[:, 1], point3d[:, 2], s=1, cmap='gray') 
+    ax.scatter(point_3d_all[:, 0], point_3d_all[:, 1], point_3d_all[:, 2], s=5, cmap='blue') 
+    
+    # Plot the camera position as a point
+    ax.scatter(camera_pose_all[:, 0], camera_pose_all[:, 1], camera_pose_all[:, 2], s=10, color='r')
+
+    # Adjust plot limits
+    # ax.set_xlim([-50, 50])  # Set appropriate values for xmin and xmax
+    # ax.set_ylim([-50, 50])  # Set appropriate values for ymin and ymax
+    # ax.set_zlim([-50, 50])  # Set appropriate values for zmin and zmax
+
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
+
     plt.show()
     plt.savefig('output/3d_points_house_loop.png')
 
