@@ -121,15 +121,16 @@ def main():
                 src_pts_2d = src_pts[valid]
                 src_pts_3d = torch.cat([p.unsqueeze(dim=0) for p in src_pts_3d if p is not None])
                 
-                src_pts_3d_np = src_pts_3d.detach().numpy()
-                src_pts_2d_np = src_pts_2d.detach().numpy()
+                T_rt = K.geometry.solve_pnp_dlt(src_pts_3d[:, :-1].unsqueeze(dim=0), src_pts_2d.unsqueeze(dim=0), mtx_torch.unsqueeze(dim=0))
                 
-                _, R_vec, T = cv2.solvePnP(src_pts_3d_np[:, :-1], src_pts_2d_np, mtx, np.zeros((4,1)))
-                R, _ = cv2.Rodrigues(R_vec)
+                # src_pts_3d_np = src_pts_3d.detach().numpy()
+                # src_pts_2d_np = src_pts_2d.detach().numpy()
+                # _, R_vec, T = cv2.solvePnP(src_pts_3d_np[:, :-1], src_pts_2d_np, mtx, np.zeros((4,1)))
+                # R, _ = cv2.Rodrigues(R_vec)
 
                 # Convert R, T to torch tensors
-                R = torch.from_numpy(R).float()
-                T = torch.from_numpy(T).float()
+                R = T_rt[0, :3, :3]
+                T = T_rt[0, :3,  3]
 
                 R_t_1[:3,:3] = R
                 R_t_1[:3,3] = T.squeeze()
