@@ -1,10 +1,10 @@
 import cv2
 import torch
+import kornia as K
 import numpy as np
 import matplotlib.pyplot as plt
 from feature_extractor_pt import FeatureExtractor, FeatureMatcher
 from pose_estimiation_pt import PoseEstimator
-from bundle_adjuster_pt import BundleAdjuster
 
 import kornia as K
 
@@ -23,7 +23,7 @@ def read_args():
 
 def main():
     # set the seed to make each run deterministic
-    torch.manual_seed(42)
+    # torch.manual_seed(42)
     flags = read_args()
     dataset_name = flags.dataset
 
@@ -66,8 +66,11 @@ def main():
     # ax = fig.add_subplot(111, projection='3d')
 
     # Iterate through frames with interval
-    interval = 10
-    end = 15
+    # Initialize map from 2D keypoints to 3D points
+    map_2d_to_3d = {}
+
+    interval = 2
+    end = 10
     pbar = tqdm(enumerate(images_name[:end:interval]), total=len(images_name[:end:interval]))
     # wrap tqdm around the loop to display progress bar
     for i, image_name in pbar:
@@ -76,11 +79,10 @@ def main():
         kp, des = feature_extractor.extract(img)
 
         if i == 0:
-            prev_img = img
             prev_kp = kp
             prev_des = des
-        else:
-            scores, matches = feature_matcher.match(prev_des, des, prev_kp, kp)
+        elif i == 1:
+            _, matches = feature_matcher.match(prev_des, des, prev_kp, kp)
             src_pts = prev_kp[0, matches[:,0], :, 2].float()
             dst_pts = kp[0, matches[:,1], :, 2].float()
 
@@ -95,35 +97,70 @@ def main():
             R_t_1[:3,:3] = R @ R_t_0[:3,:3]
             R_t_1[:3, 3] = R_t_0[:3, 3] + R_t_0[:3,:3] @ T.ravel()
 
-            # R_t_1[:3, 3] = T.ravel() + R @ R_t_0[:3, 3]
             P2 = mtx_torch @ R_t_1
-
-            camera_pose_all.append(R_t_1[:3, 3].data.clone())
-
             points3d = pose_estimator.triangulate_points(P1, P2, src_pts, dst_pts)
 
-            # Visualize 3D points in real time
-            # points3d_np = points3d.detach().numpy()
-            # ax.scatter(points3d_np[:, 0], points3d_np[:, 1], points3d_np[:, 2], color='b', s=10) 
-            # plt.pause(0.5)
-            # plt.show()
-
-            point_3d_all.append(points3d.data.clone())
-
-            # compute reprojection error and visualize to debug
-            # reproj_2d_1, reproj_2d_2, err = compute_reprojection_error(points3d[:,:3], src_pts, dst_pts, P1=P1, P2=P2)
-            # pbar.set_postfix({'Reprojection Error': err})
-
-            # # print reprojection error
-            # print('Average reprojection error: {}'.format(err))
-
-            R_t_0 = R_t_1 
-            P1 = P2
-
-            prev_img = img
+            map_2d_to_3d = {tuple(pt2d.tolist()): pt3d for pt2d, pt3d in zip(dst_pts, points3d)}
+            P1 = P2.clone()
+            
             prev_kp = kp
             prev_des = des
+        else:
+            _, matches = feature_matcher.match(prev_des, des, prev_kp, kp)
+            src_pts = prev_kp[0, matches[:,0], :, 2].float()
+            dst_pts = kp[0, matches[:,1], :, 2].float()
+            
+            
+            # Instead of estimating Fundamental matrix and Essential matrix,
+            # check if there are enough 2D-3D correspondences in map_2d_to_3d
+            src_pts_3d = [map_2d_to_3d.get(tuple(p.tolist()), None) for p in src_pts]
+            
+            if src_pts_3d.count(None) < len(src_pts_3d) - 8:
+                # There are enough 2D-3D correspondences, use PnP to estimate pose
+                valid = [p is not None for p in src_pts_3d]
+                src_pts_2d = src_pts[valid]
+                src_pts_3d = torch.cat([p.unsqueeze(dim=0) for p in src_pts_3d if p is not None])
+                
+                src_pts_3d_np = src_pts_3d.detach().numpy()
+                src_pts_2d_np = src_pts_2d.detach().numpy()
+                
+                _, R_vec, T = cv2.solvePnP(src_pts_3d_np[:, :-1], src_pts_2d_np, mtx, np.zeros((4,1)))
+                R, _ = cv2.Rodrigues(R_vec)
 
+                # Convert R, T to torch tensors
+                R = torch.from_numpy(R).float()
+                T = torch.from_numpy(T).float()
+
+                R_t_1[:3,:3] = R
+                R_t_1[:3,3] = T.squeeze()
+
+                P2 = mtx_torch @ R_t_1
+                
+                # update camera poses
+                camera_pose_all.append(R_t_1[:3, 3].data.clone())
+                
+                # Try to triangulate points. If PnP was used, this might fail for some points,
+                # as the new 2D points might not correspond to the same 3D points as before.
+                # But that's ok, as long as some points can be triangulated, they can be added to the map.
+                try:
+                    points3d = pose_estimator.triangulate_points(P1, P2, src_pts, dst_pts)
+                    point_3d_all.append(points3d.data.clone())
+
+                    # Update map_2d_to_3d with newly triangulated points
+                    for i in range(len(src_pts)):
+                        map_2d_to_3d[tuple(src_pts[i].tolist())] = points3d[i].tolist()
+
+                except:
+                    pass
+
+                R_t_0 = R_t_1 
+                P1 = P2.clone()
+
+                prev_kp = kp
+                prev_des = des
+            else:
+                print('Not enough 2D-3D correspondences, skipping frame')
+                
     point_3d_all = torch.cat(point_3d_all, dim=0)
     # torch.save(point3d, 'point3d_hose_loop_50.pt')
 
