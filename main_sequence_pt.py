@@ -68,7 +68,7 @@ def main():
     map_2d_to_3d = {}
 
     interval = 3
-    end = 10
+    end = 7
     prev_kp = None
     prev_des = None
     pbar = tqdm(enumerate(images_name[:end:interval]), total=len(images_name[:end:interval]))
