@@ -35,8 +35,9 @@ def get_pinhole_intrinsic_params(calibration_file_dir):
 def visualize_LAF(img, LAF, img_idx = 0):
     x, y = K.feature.laf.get_laf_pts_to_draw(LAF, img_idx)
     plt.figure()
-    plt.imshow(K.utils.tensor_to_image(img[img_idx]))
-    plt.plot(x, y, 'r')
+    plt.imshow(cv2.cvtColor(K.utils.tensor_to_image(img[img_idx]), cv2.COLOR_BGR2RGB))
+    plt.plot(x, y, color='limegreen',linewidth=1.5)
+    plt.axis('off')
     plt.show()
     return
 
