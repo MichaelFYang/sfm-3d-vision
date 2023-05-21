@@ -28,7 +28,7 @@ class FeatureExtractor:
             self.descriptor = K.feature.SIFTDescriptor(self.patch_size)
             scale_pyr = K.geometry.ScalePyramid(min_size=self.patch_size, double_image=True)
             nms = K.geometry.ConvQuadInterp3d()
-            n_features = 500
+            n_features = 300
             # n_features = 100
             self.detector = K.feature.ScaleSpaceDetector(n_features,
                                         resp_module=resp,
