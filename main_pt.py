@@ -1,5 +1,6 @@
 import cv2
 import torch
+import pypose as pp
 import numpy as np
 import matplotlib.pyplot as plt
 from feature_extractor_pt import FeatureExtractor, FeatureMatcher
@@ -102,12 +103,12 @@ def main():
     visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_2)
 
     # create leaf nodes that require grad for R, T, point3d
-    R_opt = R.clone().detach().requires_grad_(True)
-    T_opt = T.clone().detach().requires_grad_(True)
+    T_opt = torch.hstack((R, T.reshape((3,1))))
+    T_pp_opt = pp.mat2SE3(T_opt).detach().requires_grad_(True)
     point3d_opt = point3d.clone().detach().requires_grad_(True)
 
     # init Trainer
-    bundle_adjuster = BundleAdjuster(R_opt, T_opt, point3d_opt, mtx_torch, src_pts.detach(), dst_pts.detach(), optimizer='adam')
+    bundle_adjuster = BundleAdjuster(point3d_opt, mtx_torch, src_pts.detach(), dst_pts.detach(), P=T_pp_opt, optimizer='adam')
 
     num_iters = 0
 
