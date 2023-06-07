@@ -28,7 +28,7 @@ class FeatureExtractor:
             self.descriptor = K.feature.SIFTDescriptor(self.patch_size)
             scale_pyr = K.geometry.ScalePyramid(min_size=self.patch_size, double_image=True)
             nms = K.geometry.ConvQuadInterp3d()
-            n_features = 500
+            n_features = 5000
             # n_features = 100
             self.detector = K.feature.ScaleSpaceDetector(n_features,
                                         resp_module=resp,
@@ -46,8 +46,8 @@ class FeatureExtractor:
             self.detector = K.feature.LoFTR(pretrained="outdoor")
 
     def undistort_image(self, img):
-        img_tensor = K.image_to_tensor(img, keepdim=False).float()
-        undistorted_image = K.geometry.calibration.undistort_image(img_tensor, self.mtx, self.dist)
+        # img_tensor = K.image_to_tensor(img, keepdim=False).float()
+        undistorted_image = K.geometry.calibration.undistort_image(img, self.mtx, self.dist)
         return undistorted_image
 
     def rgb_to_gray(self, img):
@@ -59,9 +59,11 @@ class FeatureExtractor:
         return response_map
 
     def extract(self, img):
-        img_undist = self.undistort_image(img)
-        gray = self.rgb_to_gray(img_undist)
-        # img_gray = K.tensor_to_image(gray)
+        if isinstance(img, np.ndarray):
+            img = K.image_to_tensor(img, keepdim=False).float()
+        if img.shape[1] == 3:
+            img = self.rgb_to_gray(img)
+        gray = self.undistort_image(img)
         if self.method == 'sift':
             lafs, resps = self.detector(gray)
             patches = K.feature.extract_patches_from_pyramid(gray, lafs, self.patch_size)

@@ -8,7 +8,7 @@ from bundle_adjuster_pt import BundleAdjuster
 
 import kornia as K
 
-from utils import get_pinhole_intrinsic_params, draw_matches, visualize_reprojection, compute_reprojection_error
+from utils import get_pinhole_intrinsic_params, draw_matches, visualize_reprojection, compute_reprojection_error, visualize_pair_tensor_grayscale_images
 import os
 import argparse
 
@@ -59,85 +59,57 @@ def main():
     Descriptors are vectors that describe the local appearance of the region around each keypoint.
     numpy array of size (num_keypoints x descriptor_size)
     '''
-    # import ipdb; ipdb.set_trace()
-    kp1, des1 = feature_extractor.extract(img1)
-    kp2, des2 = feature_extractor.extract(img2)
+    img1_torch = K.image_to_tensor(img1, keepdim=False).float()
+    img2_torch = K.image_to_tensor(img2, keepdim=False).float()
+
+    img1_torch = K.color.rgb_to_grayscale(img1_torch).clone().detach().requires_grad_(True)
+    img2_torch = K.color.rgb_to_grayscale(img2_torch).clone().detach().requires_grad_(True)
     
-    # scores, matches = K.feature.match_snn(des1, des2, 0.9)
-    scores, matches = feature_matcher.match(des1, des2, kp1, kp2)
-    # scores, matches = K.feature.match_fginn(des1, des2, kp1, kp2, mutual=True)
-
-    # Now RANSAC
-    src_pts = kp1[0, matches[:,0], :, 2].float()
-    dst_pts = kp2[0, matches[:,1], :, 2].float()
-
-    Fm, inliers = pose_estimator.compute_fundametal_matrix_kornia(src_pts, dst_pts)
-    src_pts = src_pts[inliers]
-    dst_pts = dst_pts[inliers]
-
-
-    Em = K.geometry.essential_from_fundamental(Fm, mtx_torch, mtx_torch)
-
-    R, T, point3d = pose_estimator.recover_pose(Em, src_pts, dst_pts, mtx_torch)
-    # R, T, point3d = K.geometry.epipolar.motion_from_essential_choose_solution(Em, mtx_torch, mtx_torch, src_pts, dst_pts, mask=None)
-
-    reproj_2d_1, reproj_2d_2, err = compute_reprojection_error(point3d, src_pts, dst_pts, R=R, T=T, K=mtx_torch)
-    
-    # print reprojection error
-    print('Average reprojection error: {}'.format(err))
-
-    # visualize the computation graph of one pass
-    # make_dot(err, params={'R': R, 'T': T, 'point3d': point3d}).render("err_torchviz", format="png")
-
-    # visualize projection
-    visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_2)
-
-    # create leaf nodes that require grad for R, T, point3d
-    R_opt = R.clone().detach().requires_grad_(True)
-    T_opt = T.clone().detach().requires_grad_(True)
-    point3d_opt = point3d.clone().detach().requires_grad_(True)
-
-    # init Trainer
-    bundle_adjuster = BundleAdjuster(R_opt, T_opt, point3d_opt, mtx_torch, src_pts.detach(), dst_pts.detach(), optimizer='adam')
-
-    num_iters = 50
-
-    start_time = time.time()
+    num_iters = 20
 
     for _ in range(num_iters):
-        # train
-        reproj_2d_1, reproj_2d_2, err = bundle_adjuster.adjust_step()
+        # import ipdb; ipdb.set_trace()
+        kp1, des1 = feature_extractor.extract(img1_torch)
+        kp2, des2 = feature_extractor.extract(img2_torch)
+        
+        # scores, matches = K.feature.match_snn(des1, des2, 0.9)
+        scores, matches = feature_matcher.match(des1, des2, kp1, kp2)
+        # scores, matches = K.feature.match_fginn(des1, des2, kp1, kp2, mutual=True)
 
-        # check
-        # make_dot(err, params={'R': R_opt, 'T': T_opt, 'point3d': point3d_opt}).render("err_torchviz", format="png")
+        # Now RANSAC
+        src_pts = kp1[0, matches[:,0], :, 2].float()
+        dst_pts = kp2[0, matches[:,1], :, 2].float()
 
+        # with RANSAC (unstable gradient)
+        # Fm, inliers = pose_estimator.compute_fundametal_matrix_kornia(src_pts, dst_pts)
+
+        # without RANSAC
+        # Fm = pose_estimator.compute_fundamental_matrix(src_pts, dst_pts)
+        Fm = K.geometry.epipolar.find_fundamental(src_pts.unsqueeze(0), dst_pts.unsqueeze(0))
+
+        # src_pts = src_pts[inliers]
+        # dst_pts = dst_pts[inliers]
+
+        Em = K.geometry.essential_from_fundamental(Fm.squeeze(), mtx_torch, mtx_torch)
+
+        R, T, point3d = pose_estimator.recover_pose(Em, src_pts, dst_pts, mtx_torch)
+        # R, T, point3d = K.geometry.epipolar.motion_from_essential_choose_solution(Em, mtx_torch, mtx_torch, src_pts, dst_pts, mask=None)
+
+        reproj_2d_1, reproj_2d_2, err = compute_reprojection_error(point3d, src_pts, dst_pts, R=R, T=T, K=mtx_torch)
+        
         # print reprojection error
         print('Average reprojection error: {}'.format(err))
 
-        # visualize projection
-        visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_2)
-    
-    end_time = time.time()
-    execution_time = end_time - start_time
+        optimizer = torch.optim.Adam([img1_torch, img2_torch], lr=1)
 
-    print("Execution time: ", execution_time, " seconds")
+        # clear gradients for this training step
+        optimizer.zero_grad()
 
-    point3d = point3d.detach().numpy()
-    # Visualize 3D points
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(point3d[:, 0], point3d[:, 1], point3d[:, 2], c='b', marker='o')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    plt.savefig('output/3d_points_opt.png')
+        # update R, T, point3d
+        err.backward()
+        optimizer.step()
 
-    # fig2 = plt.figure()
-    # new_img = draw_matches(img1, kp1[0, :, :, 2].data.cpu().numpy(), img2, kp2[0, :, :, 2].data.cpu().numpy(), matches.data.cpu().numpy(), inliers)
-    # plt.imshow(new_img)
-    # plt.savefig('output/matches.png')
-    # plt.show()
-
+        visualize_pair_tensor_grayscale_images(img1_torch, img2_torch)
 
 if __name__ == '__main__':
     main()

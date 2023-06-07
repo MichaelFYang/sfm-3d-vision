@@ -81,8 +81,8 @@ class PoseEstimator:
         # Construct the A matrix
         A = torch.zeros((num_points, 9), dtype=torch.float32)
         for i in range(num_points):
-            x1, y1 = pts1[i, 0, 0], pts1[i, 0, 1]
-            x2, y2 = pts2[i, 0, 0], pts2[i, 0, 1]
+            x1, y1 = pts1[i, 0], pts1[i, 1]
+            x2, y2 = pts2[i, 0], pts2[i, 1]
             A[i] = torch.tensor([x1*x2, x1*y2, x1, y1*x2, y1*y2, y1, x2, y2, 1])
 
         # Compute the SVD of A

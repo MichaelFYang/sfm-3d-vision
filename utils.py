@@ -109,6 +109,23 @@ def visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1, reproj_2d_
 
     return 
 
+def visualize_pair_tensor_grayscale_images(img1, img2):
+    """Visualize the reprojection errors for multiple points on the image."""
+    # Create a figure and set up subplots
+    img1 = img1.squeeze().detach().numpy()
+    img2 = img2.squeeze().detach().numpy()    
+    
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+    axs[0].imshow(img1, cmap='gray')
+    axs[1].imshow(img2, cmap='gray')
+
+    plt.tight_layout()
+    plt.savefig('output/pair_images.png')
+    # plt.show()
+    plt.close()
+    return
+
 # drawMatches numpy version
 def draw_matches(img1, kp1, img2, kp2, matches, inliers): 
     """Draws lines between matching keypoints of two images.  
