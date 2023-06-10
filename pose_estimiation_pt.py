@@ -74,11 +74,26 @@ class PoseEstimator:
     def compute_fundamental_matrix(self, pts1, pts2):
         num_points = pts1.shape[0]
 
+        # Compute the centroids of the point sets
+        centroid1 = torch.mean(pts1, dim=0)
+        centroid2 = torch.mean(pts2, dim=0)
+
+        # Shift the origin of the points to the centroids
+        pts1_shifted = pts1 - centroid1
+        pts2_shifted = pts2 - centroid2
+
+        # Scale the points so that the average distance from the origin is sqrt(2)
+        scale1 = torch.sqrt(2) / torch.mean(torch.norm(pts1_shifted, dim=1))
+        pts1_shifted *= scale1
+
+        scale2 = torch.sqrt(2) / torch.mean(torch.norm(pts2_shifted, dim=1))
+        pts2_shifted *= scale2
+
         # Construct the A matrix
         A = torch.zeros((num_points, 9), dtype=torch.float32)
         for i in range(num_points):
-            x1, y1 = pts1[i, 0, 0], pts1[i, 0, 1]
-            x2, y2 = pts2[i, 0, 0], pts2[i, 0, 1]
+            x1, y1 = pts1_shifted[i, 0, 0], pts1_shifted[i, 0, 1]
+            x2, y2 = pts2_shifted[i, 0, 0], pts2_shifted[i, 0, 1]
             A[i] = torch.tensor([x1*x2, x1*y2, x1, y1*x2, y1*y2, y1, x2, y2, 1])
 
         # Compute the SVD of A
@@ -91,6 +106,11 @@ class PoseEstimator:
         Uf, Sf, Vtf = torch.svd(F)
         Sf[-1] = 0.0
         F_rank2 = torch.matmul(Uf, torch.matmul(torch.diag(Sf), Vtf))
+
+        # Un-normalize the fundamental matrix
+        T1 = torch.tensor([[scale1, 0, -scale1*centroid1[0, 0]], [0, scale1, -scale1*centroid1[0, 1]], [0, 0, 1]])
+        T2 = torch.tensor([[scale2, 0, -scale2*centroid2[0, 0]], [0, scale2, -scale2*centroid2[0, 1]], [0, 0, 1]])
+        F_rank2 = torch.matmul(T2.transpose(0, 1), torch.matmul(F_rank2, T1))
 
         return F_rank2
     
