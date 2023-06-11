@@ -1,10 +1,19 @@
 # Structure from Motion (SfM) Project - 3D Vision Project
 
-This is a Python project that implements a simple SfM pipeline. (TO be update... using pytorch ...) The pipeline consists of the following steps:
+This is a Python project that implements a simple differentiable SfM pipeline with PyTorch. The pipeline consists of the following steps:
 
-1. Camera calibration using a set of calibration images
-2. Feature extraction and matching between pairs of images
-3. Triangulation of 3D points from the matched features
+1. Feature extraction and matching between pairs of images
+2. Triangulation of 3D points from the matched features
+3. Utilize differentiability of the pipeline to optimize certain module
+
+![plot](./results/BA_opt.png)
+
+## Formulation
+
+- `\dataset` contains a `sample_data` for testing, and more data can be downloaded from [ETH 3D](https://www.eth3d.net/slam_datasets)
+- `\output` as an empty directory to store plots produced by `run_bundle_adjustment_pt.py` and `run_pixel_adjustment_pt.py`
+- `\test` contains example code for feature extraction of Kornia
+- scripts name as `*_pt.py` are implemented with PyTorch, whereas other are implemented with OpenCV as a baseline
 
 ## Installation
 
@@ -27,17 +36,11 @@ To utilize `cv2.SIFT_create()` you have to install OpenCV with:
 
 ## Usage
 
-To run the SfM pipeline, you can use the `main.py` script:
+### Data preparation
 
-This will perform camera calibration using the calibration images in the `calibration_images/` directory, and then reconstruct 3D points from the images in the `images/` directory.
+Download any monocular version of dataset from [ETH 3D](https://www.eth3d.net/slam_datasets), and place the unzip folder under `\dataset\<dataset_name>`.
 
-The reconstructed 3D points will be visualized using a 3D scatter plot.
-
-## Data preparation
-
-Create a `\dataset` folder in the directory, and download any monocular version of dataset from [ETH 3D](https://www.eth3d.net/slam_datasets), and place the unzip folder under `\dataset\<dataset_name>`.
-
-## Generate reprojection error plots with multiple runs
+### Generate reprojection error plots with multiple runs
 
 To plot how the reprojection error varies with optimization steps for multiple runs:
 
@@ -51,6 +54,14 @@ To plot how the reprojection error varies with optimization steps for multiple r
   ```
   python run_pixel_adjustment_pt.py sample_data
   ```
+
+### Triangulated 3D point cloud
+
+To process image sequence and plot all triangulated 3D points:
+
+```
+python main_sequence_pt.py sample_data
+```
 
 ## Customization
 
@@ -67,6 +78,7 @@ This project was inspired by the following resources:
 - [OpenCV SfM module](https://github.com/opencv/opencv/blob/master/samples/python/stereo_match.py)
 - [Pytorch](https://pytorch.org/)
 - [Exercise SfM pipeline by Hsuan-Hau Liu](https://github.com/hsuanhauliu/structure-from-motion-with-OpenCV)
+- [Kornia](https://kornia.readthedocs.io/en/latest/)
 
 ## License
 
