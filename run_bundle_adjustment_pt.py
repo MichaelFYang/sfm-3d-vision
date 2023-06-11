@@ -61,7 +61,7 @@ def main():
     numpy array of size (num_keypoints x descriptor_size)
     '''
     # import ipdb; ipdb.set_trace()
-    num_runs = 1
+    num_runs = 2
     err_lie_all_runs = []
     err_normal_all_runs = []
     for i_run in range(num_runs):
@@ -149,49 +149,49 @@ def main():
         err_lie_all_runs.append(err_Lie_all)
         err_normal_all_runs.append(err_normal_all)
 
-    # # Create a new figure
-    # plt.figure()
+    # Create a new figure
+    plt.figure()
 
-    # # Create an array of x-coordinates based on the number of time steps
-    # x_coords = np.arange(len(err_lie_all_runs[0]))
+    # Create an array of x-coordinates based on the number of time steps
+    x_coords = np.arange(len(err_lie_all_runs[0]))
 
-    # # Calculate the mean line
-    # mean_normal_all_runs = np.mean(err_normal_all_runs, axis=0)
-    # mean_lie_all_runs = np.mean(err_lie_all_runs, axis=0)
+    # Calculate the mean line
+    mean_normal_all_runs = np.mean(err_normal_all_runs, axis=0)
+    mean_lie_all_runs = np.mean(err_lie_all_runs, axis=0)
 
-    # # Create a filled region between the lines
-    # plt.fill_between(x_coords, np.min(err_lie_all_runs, axis=0), np.max(err_lie_all_runs, axis=0), alpha=0.2)
-    # plt.fill_between(x_coords, np.min(err_normal_all_runs, axis=0), np.max(err_normal_all_runs, axis=0), alpha=0.2)
+    # Create a filled region between the lines
+    plt.fill_between(x_coords, np.min(err_lie_all_runs, axis=0), np.max(err_lie_all_runs, axis=0), alpha=0.2)
+    plt.fill_between(x_coords, np.min(err_normal_all_runs, axis=0), np.max(err_normal_all_runs, axis=0), alpha=0.2)
 
-    # # Plot the mean line
-    # plt.plot(x_coords, mean_lie_all_runs, color='blue', linewidth=2, label='Lie')
-    # plt.plot(x_coords, mean_normal_all_runs, color='red', linewidth=2, label='Normal')
+    # Plot the mean line
+    plt.plot(x_coords, mean_lie_all_runs, color='blue', linewidth=2, label='Lie')
+    plt.plot(x_coords, mean_normal_all_runs, color='red', linewidth=2, label='Normal')
 
-    # # Set plot title and labels
-    # plt.title('Bundle Adjustment (Rotation Noise: {})'.format(0.1))
-    # plt.xlabel('Epochs')
-    # plt.ylabel('Reprojection Error')
-
-    # # Add legend
-    # plt.legend()
-
-    # # Display the plot
-    # plt.show()
-    
-    # Create the plot
-    plt.plot(err_Lie_all, label='Lie')
-    plt.plot(err_normal_all, label='Normal')
-
-    # Add labels and title
+    # Set plot title and labels
+    plt.title('Bundle Adjustment (Rotation Noise: {})'.format(0.1))
     plt.xlabel('Epochs')
     plt.ylabel('Reprojection Error')
-    plt.title('Bundle Adjustment')
 
     # Add legend
     plt.legend()
 
-    # Show the plot
+    # Display the plot
     plt.show()
+    
+    # # Create the plot
+    # plt.plot(err_Lie_all, label='Lie')
+    # plt.plot(err_normal_all, label='Normal')
+
+    # # Add labels and title
+    # plt.xlabel('Epochs')
+    # plt.ylabel('Reprojection Error')
+    # plt.title('Bundle Adjustment')
+
+    # # Add legend
+    # plt.legend()
+
+    # # Show the plot
+    # plt.show()
 
     # point3d = point3d.detach().numpy()
     # # Visualize 3D points
