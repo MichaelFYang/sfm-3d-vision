@@ -5,6 +5,7 @@ output/
 __pycache__/
 calibration_images/
 dataset/
+!dataset/sample_data/
 exercise4_solution/
 */.DS_Store
 err_torchviz.png
