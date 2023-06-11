@@ -70,7 +70,7 @@ def main():
     map_2d_to_3d = {}
 
     interval = 1
-    end = 3
+    end = 2
     pbar = tqdm(enumerate(images_name[:end:interval]), total=len(images_name[:end:interval]))
     # wrap tqdm around the loop to display progress bar
     for i, image_name in pbar:
@@ -161,8 +161,8 @@ def main():
             else:
                 print('Not enough 2D-3D correspondences, skipping frame')
                 
-    # point_3d_all = torch.cat(point_3d_all, dim=0)
-    point_3d_all = point_3d_all[1]
+    point_3d_all = torch.cat(point_3d_all, dim=0)
+    # point_3d_all = point_3d_all[1]
     # torch.save(point3d, 'point3d_hose_loop_50.pt')
 
     camera_pose_all = torch.stack(camera_pose_all, dim=0)
