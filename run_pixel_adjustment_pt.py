@@ -61,7 +61,7 @@ def main():
     numpy array of size (num_keypoints x descriptor_size)
     '''
     # import ipdb; ipdb.set_trace()
-    num_runs = 1
+    num_runs = 3
     err_lie_all_runs = []
     err_normal_all_runs = []
     for i_run in range(num_runs):
@@ -104,7 +104,7 @@ def main():
 
         for i in range(num_iters):
             # train
-            # reproj_2d_1_normal, reproj_2d_2_normal, err_normal, src_pts, dst_pts = pixel_opt_normal.adjust_step(pose_estimator, mode="normal")
+            reproj_2d_1_normal, reproj_2d_2_normal, err_normal, src_pts, dst_pts = pixel_opt_normal.adjust_step(pose_estimator, mode="normal")
             reproj_2d_1_lie, reproj_2d_2_lie, err_lie, src_pts_lie, dst_pts_lie = pixel_opt_lie.adjust_step(pose_estimator, mode="Lie")
             
             
@@ -116,10 +116,10 @@ def main():
 
             # print reprojection error
             print('==================== {}th Epoch ===================='.format(i))
-            # print('Normal average reprojection error: {}'.format(err_normal))
+            print('Normal average reprojection error: {}'.format(err_normal))
             print('Lie average reprojection error: {}'.format(err_lie))
 
-            # err_normal_all.append(err_normal.item())
+            err_normal_all.append(err_normal.item())
             err_lie_all.append(err_lie.item())
 
         # visualize projection
@@ -133,49 +133,49 @@ def main():
         err_lie_all_runs.append(err_lie_all)
         err_normal_all_runs.append(err_normal_all)
     
-    # # Create a new figure
-    # plt.figure()
+    # Create a new figure
+    plt.figure()
 
-    # # Create an array of x-coordinates based on the number of time steps
-    # x_coords = np.arange(len(err_lie_all_runs[0]))
+    # Create an array of x-coordinates based on the number of time steps
+    x_coords = np.arange(len(err_lie_all_runs[0]))
 
-    # # Calculate the mean line
-    # mean_normal_all_runs = np.mean(err_normal_all_runs, axis=0)
-    # mean_lie_all_runs = np.mean(err_lie_all_runs, axis=0)
+    # Calculate the mean line
+    mean_normal_all_runs = np.mean(err_normal_all_runs, axis=0)
+    mean_lie_all_runs = np.mean(err_lie_all_runs, axis=0)
 
-    # # Create a filled region between the lines
-    # plt.fill_between(x_coords, np.min(err_lie_all_runs, axis=0), np.max(err_lie_all_runs, axis=0), alpha=0.2)
-    # plt.fill_between(x_coords, np.min(err_normal_all_runs, axis=0), np.max(err_normal_all_runs, axis=0), alpha=0.2)
+    # Create a filled region between the lines
+    plt.fill_between(x_coords, np.min(err_lie_all_runs, axis=0), np.max(err_lie_all_runs, axis=0), alpha=0.2)
+    plt.fill_between(x_coords, np.min(err_normal_all_runs, axis=0), np.max(err_normal_all_runs, axis=0), alpha=0.2)
 
-    # # Plot the mean line
-    # plt.plot(x_coords, mean_lie_all_runs, color='blue', linewidth=2, label='Lie')
-    # plt.plot(x_coords, mean_normal_all_runs, color='red', linewidth=2, label='Normal')
+    # Plot the mean line
+    plt.plot(x_coords, mean_lie_all_runs, color='blue', linewidth=2, label='Lie')
+    plt.plot(x_coords, mean_normal_all_runs, color='red', linewidth=2, label='Normal')
 
-    # # Set plot title and labels
-    # plt.title('Optimizing Pixel Coordinates (Pixel Noise: {})'.format(noise_std_dev_pts))
-    # plt.xlabel('Epochs')
-    # plt.ylabel('Reprojection Error')
-
-    # # Add legend
-    # plt.legend()
-
-    # # Display the plot
-    # plt.show()
-
-    # Create the plot
-    plt.plot(err_lie_all, label='Lie')
-    plt.plot(err_normal_all, label='Normal')
-
-    # Add labels and title
+    # Set plot title and labels
+    plt.title('Optimizing Pixel Coordinates (Pixel Noise: {})'.format(noise_std_dev_pts))
     plt.xlabel('Epochs')
     plt.ylabel('Reprojection Error')
-    plt.title('Reprojection Error vs Epochs')
 
     # Add legend
     plt.legend()
 
-    # Show the plot
+    # Display the plot
     plt.show()
+
+    # # Create the plot
+    # plt.plot(err_lie_all, label='Lie')
+    # plt.plot(err_normal_all, label='Normal')
+
+    # # Add labels and title
+    # plt.xlabel('Epochs')
+    # plt.ylabel('Reprojection Error')
+    # plt.title('Reprojection Error vs Epochs')
+
+    # # Add legend
+    # plt.legend()
+
+    # # Show the plot
+    # plt.show()
 
     # point3d = point3d.detach().numpy()
     # # Visualize 3D points
