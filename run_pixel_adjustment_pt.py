@@ -1,0 +1,198 @@
+import cv2
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+from pixel_adjuster_pt import PixelAdjuster
+from feature_extractor_pt import FeatureExtractor, FeatureMatcher
+from pose_estimiation_pt import PoseEstimator
+from bundle_adjuster_pt import BundleAdjuster
+
+import kornia as K
+
+from utils import get_pinhole_intrinsic_params, draw_matches, visualize_reprojection, compute_reprojection_error, get_noise_rotation
+import os
+import argparse
+
+# from torchviz import make_dot, make_dot_from_trace
+import time
+
+def read_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('dataset')
+    return parser.parse_args()
+
+def main():
+    # set the seed to make each run deterministic
+    torch.manual_seed(42)
+    flags = read_args()
+    dataset_name = flags.dataset
+
+    curr_dir_path = os.getcwd()
+    images_dir = os.path.join(curr_dir_path, 'dataset', dataset_name, 'rgb') 
+    calibration_file_dir = os.path.join(curr_dir_path, 'dataset', dataset_name) 
+
+    images_name = os.listdir(images_dir)
+
+    # sort images by timestamp
+    images_name = sorted(images_name, key=lambda x: float(x[:-4]))
+    
+    # read K from calibration file
+    mtx = get_pinhole_intrinsic_params(calibration_file_dir)
+    mtx_torch = torch.tensor(mtx).float()
+    dist = np.zeros((5,))
+
+    interval = 10
+    img1_path = os.path.join(images_dir, images_name[0])
+    img1 = cv2.imread(img1_path)
+    img2_path = os.path.join(images_dir, images_name[interval])
+    img2 = cv2.imread(img2_path)
+
+    # Initialize feature extractor and feature matcher
+    feature_extractor = FeatureExtractor(mtx, dist, method='sift')
+    feature_matcher = FeatureMatcher()
+    pose_estimator = PoseEstimator(mtx, dist)
+
+    # Extract features and descriptors
+    '''
+    Keypoints correspond to specific locations in the image. cv2.KeyPoint
+    Each keypoint is represented by a 2D coordinate (x, y) and a scale and orientation.
+
+    Descriptors are vectors that describe the local appearance of the region around each keypoint.
+    numpy array of size (num_keypoints x descriptor_size)
+    '''
+    # import ipdb; ipdb.set_trace()
+    num_runs = 3
+    err_lie_all_runs = []
+    err_normal_all_runs = []
+    for i_run in range(num_runs):
+        print('Run {}'.format(i_run))
+        kp1, des1 = feature_extractor.extract(img1)
+        kp2, des2 = feature_extractor.extract(img2)
+    
+        # scores, matches = K.feature.match_snn(des1, des2, 0.9)
+        scores, matches = feature_matcher.match(des1, des2, kp1, kp2)
+        # scores, matches = K.feature.match_fginn(des1, des2, kp1, kp2, mutual=True)
+
+        # Now RANSAC
+        src_pts = kp1[0, matches[:,0], :, 2].float()
+        dst_pts = kp2[0, matches[:,1], :, 2].float()
+
+        _, inliers = pose_estimator.compute_fundametal_matrix_kornia(src_pts, dst_pts)
+        src_pts = src_pts[inliers]
+        dst_pts = dst_pts[inliers]
+
+        # add noise to src_pts and dst_pts
+        noise_std_dev_pts = 0.5  # set your noise standard deviation for points
+        src_pts_noise = torch.normal(mean=0., std=noise_std_dev_pts, size=src_pts.shape) * 10
+        dst_pts_noise = torch.normal(mean=0., std=noise_std_dev_pts, size=dst_pts.shape) * 10
+
+        src_pts_noisy = src_pts + src_pts_noise
+        dst_pts_noisy = dst_pts + dst_pts_noise
+
+        src_pts_noisy_lie = src_pts_noisy.clone().detach().requires_grad_(True)
+        dst_pts_noisy_lie = dst_pts_noisy.clone().detach().requires_grad_(True)
+
+        pixel_opt_normal = PixelAdjuster(src_pts=src_pts_noisy, dst_pts=dst_pts_noisy, K=mtx_torch)
+        pixel_opt_lie = PixelAdjuster(src_pts=src_pts_noisy_lie, dst_pts=dst_pts_noisy_lie, K=mtx_torch)
+        
+        num_iters = 500
+
+        start_time = time.time()
+
+        err_normal_all = []
+        err_lie_all = []
+
+        for i in range(num_iters):
+            # train
+            reproj_2d_1_normal, reproj_2d_2_normal, err_normal, src_pts, dst_pts = pixel_opt_normal.adjust_step(pose_estimator, mode="normal")
+            reproj_2d_1_lie, reproj_2d_2_lie, err_lie, src_pts_lie, dst_pts_lie = pixel_opt_lie.adjust_step(pose_estimator, mode="Lie")
+            
+            
+            # visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1_normal, reproj_2d_2_normal, key='normal_live_noise{}'.format(noise_std_dev_pts))
+            if i % 10 == 0:
+                visualize_reprojection(img1, img2, src_pts_lie, dst_pts_lie, reproj_2d_1_lie, reproj_2d_2_lie, key='lie_live_noise{}'.format(noise_std_dev_pts))
+            # check
+            # make_dot(err, params={'R': R_opt, 'T': T_opt, 'point3d': point3d_opt}).render("err_torchviz", format="png")
+
+            # print reprojection error
+            print('==================== {}th Epoch ===================='.format(i))
+            print('Normal average reprojection error: {}'.format(err_normal))
+            print('Lie average reprojection error: {}'.format(err_lie))
+
+            err_normal_all.append(err_normal.item())
+            err_lie_all.append(err_lie.item())
+
+        # visualize projection
+        # visualize_reprojection(img1, img2, src_pts, dst_pts, reproj_2d_1_normal, reproj_2d_2_normal, key='normal_last_noise{}'.format(noise_std_dev_pts))
+        # visualize_reprojection(img1, img2, src_pts_lie, dst_pts_lie, reproj_2d_1_lie, reproj_2d_2_lie, key='lie_last_noise{}'.format(noise_std_dev_pts))
+        
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print("Execution time: ", execution_time, " seconds")
+
+        err_lie_all_runs.append(err_lie_all)
+        err_normal_all_runs.append(err_normal_all)
+    
+    # Create a new figure
+    plt.figure()
+
+    # Create an array of x-coordinates based on the number of time steps
+    x_coords = np.arange(len(err_lie_all_runs[0]))
+
+    # Calculate the mean line
+    mean_normal_all_runs = np.mean(err_normal_all_runs, axis=0)
+    mean_lie_all_runs = np.mean(err_lie_all_runs, axis=0)
+
+    # Create a filled region between the lines
+    plt.fill_between(x_coords, np.min(err_lie_all_runs, axis=0), np.max(err_lie_all_runs, axis=0), alpha=0.2)
+    plt.fill_between(x_coords, np.min(err_normal_all_runs, axis=0), np.max(err_normal_all_runs, axis=0), alpha=0.2)
+
+    # Plot the mean line
+    plt.plot(x_coords, mean_lie_all_runs, color='blue', linewidth=2, label='Lie')
+    plt.plot(x_coords, mean_normal_all_runs, color='red', linewidth=2, label='Normal')
+
+    # Set plot title and labels
+    plt.title('Optimizing Pixel Coordinates (Pixel Noise: {})'.format(noise_std_dev_pts))
+    plt.xlabel('Epochs')
+    plt.ylabel('Reprojection Error')
+
+    # Add legend
+    plt.legend()
+
+    # Display the plot
+    plt.show()
+
+    # # Create the plot
+    # plt.plot(err_lie_all, label='Lie')
+    # plt.plot(err_normal_all, label='Normal')
+
+    # # Add labels and title
+    # plt.xlabel('Epochs')
+    # plt.ylabel('Reprojection Error')
+    # plt.title('Reprojection Error vs Epochs')
+
+    # # Add legend
+    # plt.legend()
+
+    # # Show the plot
+    # plt.show()
+
+    # point3d = point3d.detach().numpy()
+    # # Visualize 3D points
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter(point3d[:, 0], point3d[:, 1], point3d[:, 2], c='b', marker='o')
+    # ax.set_xlabel('X')
+    # ax.set_ylabel('Y')
+    # ax.set_zlabel('Z')
+    # plt.savefig('output/3d_points_opt.png')
+
+    # fig2 = plt.figure()
+    # new_img = draw_matches(img1, kp1[0, :, :, 2].data.cpu().numpy(), img2, kp2[0, :, :, 2].data.cpu().numpy(), matches.data.cpu().numpy(), inliers)
+    # plt.imshow(new_img)
+    # plt.savefig('output/matches.png')
+    # plt.show()
+
+
+if __name__ == '__main__':
+    main()
