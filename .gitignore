@@ -1,6 +1,6 @@
 .vscode
 .idea/
-output/
+output/*
 .DS_Store
 __pycache__/
 calibration_images/
@@ -10,3 +10,5 @@ exercise4_solution/
 */.DS_Store
 err_torchviz.png
 *.pt
+images/
+
