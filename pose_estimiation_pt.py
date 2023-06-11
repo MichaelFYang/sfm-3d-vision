@@ -15,7 +15,7 @@ class PoseEstimator:
         self.mtx = mtx
         self.dist = dist
         self.method = method
-        self.ransca = K.geometry.ransac.RANSAC(model_type='fundamental', max_iter=100, max_lo_iters=50)
+        self.ransca = K.geometry.ransac.RANSAC(model_type='fundamental')
 
     def estimate(self, kp1, kp2, matches):
         """
@@ -140,7 +140,7 @@ class PoseEstimator:
             # Project points into the second camera coordinate system
             P1 = K @ torch.eye(3, 4, dtype=torch.float32)
             P2 = K @ torch.cat((possible_R, possible_t), dim=1)
-            points3D, _ = self.triangulate_points(P1, P2, pts1, pts2)
+            points3D = self.triangulate_points(P1, P2, pts1, pts2)
 
             # Check the cheirality condition
             valid_points_mask = points3D[:, 2] > 0
@@ -183,7 +183,7 @@ class PoseEstimator:
             # Project points into the second camera coordinate system
             P1 = K @ torch.eye(3, 4, dtype=torch.float32)
             P2 = K @ torch.cat((possible_R, possible_t), dim=1)
-            points3D, _ = self.triangulate_points(P1, P2, pts1, pts2)
+            points3D = self.triangulate_points(P1, P2, pts1, pts2)
 
             # Check the cheirality condition
             points3D_1 = points3D @ torch.eye(3, 4, dtype=torch.float32).T
@@ -204,10 +204,9 @@ class PoseEstimator:
 
         return R, T, valid_points3D[:, :3]
 
-    def triangulate_points(self, P1, P2, pts1, pts2, threshold=5.0):
+    def triangulate_points(self, P1, P2, pts1, pts2):
         num_points = pts1.shape[0]
         points3D = torch.zeros((num_points, 4), dtype=torch.float32)
-        valid_flag = torch.zeros((num_points), dtype=torch.bool)
 
         for i in range(num_points):
             A = torch.zeros((4, 4), dtype=torch.float32)
@@ -227,16 +226,4 @@ class PoseEstimator:
 
             points3D[i] = X
 
-            # Check if the error is below a threshold
-            reproj_pts1 = P1 @ X
-            reproj_pts1 = reproj_pts1 / reproj_pts1[-1]
-            error1 = torch.norm(reproj_pts1[:2] - pts1[i])
-
-            reproj_pts2 = P2 @ X
-            reproj_pts2 = reproj_pts2 / reproj_pts2[-1]
-            error2 = torch.norm(reproj_pts2[:2] - pts2[i])
-
-            if error1 < threshold and error2 < threshold:
-                valid_flag[i] = True
-
-        return points3D, valid_flag
+        return points3D
