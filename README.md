@@ -1,17 +1,18 @@
-# Structure from Motion (SfM) Project - 3D Vision Project
+# Differentiable Structure-from-Motion (SfM) - 3D Vision Project
 
-This is a Python project that implements a simple differentiable SfM pipeline with PyTorch. The pipeline consists of the following steps:
+This is a project for the ETH Master's course 3D Vision, for which a differentiable SfM pipeline in PyTorch has been implemented. The pipeline consists of the following steps:
 
-1. Feature extraction and matching between pairs of images
-2. Triangulation of 3D points from the matched features
-3. Utilize differentiability of the pipeline to optimize certain module
+1. Feature extraction and matching across pairs of images
+2. Relative camera pose estimation between two successive camera views
+3. Triangulation of 3D points from the matched features
+4. Utilize differentiability of the pipeline to optimize certain module
 
 ![plot](./results/BA_opt.png)
 
 ## Formulation
 
 - `\dataset` contains a `sample_data` for testing, and more data can be downloaded from [ETH 3D](https://www.eth3d.net/slam_datasets)
-- `\output` as an empty directory to store plots produced by `run_bundle_adjustment_pt.py` and `run_pixel_adjustment_pt.py`
+- `\output` is an empty directory to store plots produced by `run_bundle_adjustment_pt.py` and `run_pixel_adjustment_pt.py`
 - `\test` contains example code for feature extraction of Kornia
 - scripts name as `*_pt.py` are implemented with PyTorch, whereas other are implemented with OpenCV as a baseline
 
@@ -44,13 +45,13 @@ Download any monocular version of dataset from [ETH 3D](https://www.eth3d.net/sl
 
 To plot how the reprojection error varies with optimization steps for multiple runs:
 
-- Bundle adjustment
+- Camera pose and 3D point coordinates optimization (Bundle adjustment)
 
   ```
   python run_bundle_adjustment_pt.py sample_data
   ```
 
-- Feature coordinates adjustment
+- 2D point coordinates optimization (Feature adjustment)
   ```
   python run_pixel_adjustment_pt.py sample_data
   ```
